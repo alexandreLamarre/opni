@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/backoff/v2"
 	"github.com/rancher/opni/pkg/auth/cluster"
@@ -15,7 +14,6 @@ import (
 	"github.com/rancher/opni/plugins/logging/pkg/util"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	otlpcommonv1 "go.opentelemetry.io/proto/otlp/common/v1"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -29,70 +27,27 @@ const (
 	caseNumberKey  = "case_number"
 )
 
-type OTELForwarder struct {
+type LogsForwarder struct {
 	collogspb.UnsafeLogsServiceServer
-	otelForwarderOptions
+	forwarderOptions
 
 	Client   *util.AsyncClient[collogspb.LogsServiceClient]
 	clientMu sync.RWMutex
 }
 
-type otelForwarderOptions struct {
-	collectorAddressOverride string
-	cc                       grpc.ClientConnInterface
-	lg                       *zap.SugaredLogger
-	dialOptions              []grpc.DialOption
-}
-
-type OTELForwarderOption func(*otelForwarderOptions)
-
-func (o *otelForwarderOptions) apply(opts ...OTELForwarderOption) {
-	for _, op := range opts {
-		op(o)
-	}
-}
-
-func WithAddress(address string) OTELForwarderOption {
-	return func(o *otelForwarderOptions) {
-		o.collectorAddressOverride = address
-	}
-}
-
-func WithClientConn(cc grpc.ClientConnInterface) OTELForwarderOption {
-	return func(o *otelForwarderOptions) {
-		o.cc = cc
-	}
-}
-
-func WithLogger(lg *zap.SugaredLogger) OTELForwarderOption {
-	return func(o *otelForwarderOptions) {
-		o.lg = lg
-	}
-}
-
-func WithDialOptions(opts ...grpc.DialOption) OTELForwarderOption {
-	return func(o *otelForwarderOptions) {
-		o.dialOptions = opts
-	}
-}
-
-func NewOTELForwarder(opts ...OTELForwarderOption) *OTELForwarder {
-	options := otelForwarderOptions{
+func NewLogsForwarder(opts ...ForwarderOption) *LogsForwarder {
+	options := forwarderOptions{
 		collectorAddressOverride: defaultAddress,
 		lg:                       logger.NewPluginLogger().Named("default-otel"),
 	}
 	options.apply(opts...)
-	return &OTELForwarder{
-		otelForwarderOptions: options,
-		Client:               util.NewAsyncClient[collogspb.LogsServiceClient](),
+	return &LogsForwarder{
+		forwarderOptions: options,
+		Client:           util.NewAsyncClient[collogspb.LogsServiceClient](),
 	}
 }
 
-func (f *OTELForwarder) BackgroundInitClient() {
-	f.Client.BackgroundInitClient(f.initializeOTELForwarder)
-}
-
-func (f *OTELForwarder) SetClient(cc grpc.ClientConnInterface) {
+func (f *LogsForwarder) SetClient(cc grpc.ClientConnInterface) {
 	f.clientMu.Lock()
 	defer f.clientMu.Unlock()
 
@@ -100,7 +55,7 @@ func (f *OTELForwarder) SetClient(cc grpc.ClientConnInterface) {
 	f.Client.SetClient(client)
 }
 
-func (f *OTELForwarder) initializeOTELForwarder() collogspb.LogsServiceClient {
+func (f *LogsForwarder) initializeLogsForwarder() collogspb.LogsServiceClient {
 	if f.cc == nil {
 		ctx := context.Background()
 		expBackoff := backoff.Exponential(
@@ -132,7 +87,7 @@ func (f *OTELForwarder) initializeOTELForwarder() collogspb.LogsServiceClient {
 	return collogspb.NewLogsServiceClient(f.cc)
 }
 
-func (f *OTELForwarder) Export(
+func (f *LogsForwarder) Export(
 	ctx context.Context,
 	request *collogspb.ExportLogsServiceRequest,
 ) (*collogspb.ExportLogsServiceResponse, error) {
@@ -195,7 +150,7 @@ func keyExists(attr []*otlpcommonv1.KeyValue, key string) bool {
 	return false
 }
 
-func (f *OTELForwarder) forwardLogs(
+func (f *LogsForwarder) forwardLogs(
 	ctx context.Context,
 	request *collogspb.ExportLogsServiceRequest,
 ) (*collogspb.ExportLogsServiceResponse, error) {
@@ -207,7 +162,7 @@ func (f *OTELForwarder) forwardLogs(
 	return resp, nil
 }
 
-func (f *OTELForwarder) handleLogsPost(c *gin.Context) {
+func (f *LogsForwarder) handleLogsPost(c *gin.Context) {
 	f.clientMu.RLock()
 	defer f.clientMu.RUnlock()
 	if !f.Client.IsSet() {
@@ -224,9 +179,4 @@ func (f *OTELForwarder) handleLogsPost(c *gin.Context) {
 		c.String(http.StatusUnsupportedMediaType, "unsupported media type, supported: [%s,%s]", jsonContentType, pbContentType)
 		return
 	}
-}
-
-func (f *OTELForwarder) ConfigureRoutes(router *gin.Engine) {
-	router.POST("/api/agent/otel/v1/logs", f.handleLogsPost)
-	pprof.Register(router, "/debug/plugin_logging/pprof")
 }

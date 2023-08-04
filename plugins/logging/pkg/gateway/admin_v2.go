@@ -66,7 +66,7 @@ type LoggingManagerV2 struct {
 	logger            *zap.SugaredLogger
 	alertingServer    *alerting.AlertingManagementServer
 	opensearchManager *opensearchdata.Manager
-	otelForwarder     *otel.OTELForwarder
+	otelForwarder     *otel.Forwarder
 	storageNamespace  string
 	natsRef           *corev1.LocalObjectReference
 	k8sObjectsName    string
