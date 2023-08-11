@@ -97,7 +97,7 @@ service:
       receivers: ["otlp"]
       processors: ["resource", "attributes", "transform"]
       exporters: ["opensearch"]
-	traces:
+    traces:
       receivers: ["otlp"]
       processors: ["no_op"]
       exporters: ["opensearch"]
