@@ -42,6 +42,7 @@ const (
 	clusterOutputName  = "opni-output"
 	clusterFlowName    = "opni-flow"
 	loggingConfigName  = "opni-logging"
+	traceConfigName    = "opni-tracing"
 )
 
 type KubernetesManagerDriver struct {
@@ -119,14 +120,24 @@ func (m *KubernetesManagerDriver) ConfigureNode(config *node.LoggingCapabilityCo
 	var success bool
 BACKOFF:
 	for backoff.Continue(b) {
-		collectorConf := m.buildLoggingCollectorConfig()
-		if err := m.reconcileObject(collectorConf, config.Enabled); err != nil {
+		logCollectorConf := m.buildLoggingCollectorConfig()
+		traceCollectorConf := m.buildTraceCollectorConfig()
+
+		if err := m.reconcileObject(logCollectorConf, config.Enabled); err != nil {
 			m.Logger.With(
-				"object", client.ObjectKeyFromObject(collectorConf).String(),
+				"object", client.ObjectKeyFromObject(logCollectorConf).String(),
 				zap.Error(err),
 			).Error("error reconciling object")
 			continue BACKOFF
 		}
+		if err := m.reconcileObject(traceCollectorConf, config.Enabled); err != nil {
+			m.Logger.With(
+				"object", client.ObjectKeyFromObject(traceCollectorConf).String(),
+				zap.Error(err),
+			).Error("error reconciling object")
+			continue BACKOFF
+		}
+
 		if err := m.reconcileCollector(config.Enabled); err != nil {
 			m.Logger.With(
 				"object", "opni collector",
@@ -158,6 +169,16 @@ func (m *KubernetesManagerDriver) buildLoggingCollectorConfig() *opniloggingv1be
 		},
 	}
 	return collectorConfig
+}
+
+func (m *KubernetesManagerDriver) buildTraceCollectorConfig() *opniloggingv1beta1.TraceCollectorConfig {
+	traceCollectorConfig := &opniloggingv1beta1.TraceCollectorConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "opni-tracing",
+		},
+		Spec: opniloggingv1beta1.TraceCollectorConfigSpec{},
+	}
+	return traceCollectorConfig
 }
 
 // TODO: make this generic
@@ -216,6 +237,10 @@ func (m *KubernetesManagerDriver) reconcileCollector(shouldExist bool) error {
 		coll.Spec.LoggingConfig = &corev1.LocalObjectReference{
 			Name: loggingConfigName,
 		}
+		coll.Spec.TracesConfig = &corev1.LocalObjectReference{
+			Name: traceConfigName,
+		}
+
 		return m.k8sClient.Create(context.TODO(), coll)
 	}
 
@@ -228,8 +253,12 @@ func (m *KubernetesManagerDriver) reconcileCollector(shouldExist bool) error {
 			coll.Spec.LoggingConfig = &corev1.LocalObjectReference{
 				Name: loggingConfigName,
 			}
+			coll.Spec.TracesConfig = &corev1.LocalObjectReference{
+				Name: traceConfigName,
+			}
 		} else {
 			coll.Spec.LoggingConfig = nil
+			coll.Spec.TracesConfig = nil
 		}
 
 		return m.k8sClient.Update(context.TODO(), coll)
