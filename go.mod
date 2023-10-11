@@ -39,7 +39,6 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/grafana-operator/grafana-operator/v4 v4.10.1
 	github.com/grafana-operator/grafana-operator/v5 v5.4.1
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.2
@@ -168,6 +167,8 @@ require (
 	sigs.k8s.io/node-feature-discovery-operator v0.2.1-0.20230131182250-99b8584e2745
 	sigs.k8s.io/yaml v1.3.0
 )
+
+require github.com/go-logr/zapr v1.2.4 // indirect
 
 require (
 	github.com/bitly/go-simplejson v0.5.1 // indirect
@@ -589,7 +590,8 @@ replace (
 	github.com/grafana-operator/grafana-operator/v5 => github.com/jaehnri/grafana-operator/v5 v5.0.0-20231020173843-d3cc7760ef53
 	// https://github.com/hashicorp/go-plugin/pull/251
 	github.com/hashicorp/go-plugin => github.com/alexandreLamarre/go-plugin v0.1.1-0.20230417174342-eab684801be5
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza => github.com/dbason/opentelemetry-collector-contrib/pkg/stanza v0.0.0-20230704041503-6f0f267c2d92
+	// github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza => github.com/dbason/opentelemetry-collector-contrib/pkg/stanza v0.0.0-20230704041503-6f0f267c2d92
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/stanza => github.com/jan-law/opentelemetry-collector-contrib/pkg/stanza v0.0.0-20231011183323-1da8f0d6468b
 	github.com/opensearch-project/opensearch-go/v2 => github.com/dbason/opensearch-go/v2 v2.0.0-20221202021211-6aec8f80bc41
 	github.com/rancher/charts-build-scripts => github.com/dbason/charts-build-scripts v0.3.4-0.20220429024555-807c076e8116
 	opensearch.opster.io => github.com/dbason/opensearch-k8s-operator/opensearch-operator v0.0.0-20230911044558-c677eb01b26a
