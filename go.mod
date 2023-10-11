@@ -168,7 +168,10 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require github.com/go-logr/zapr v1.2.4 // indirect
+require (
+	github.com/go-logr/zapr v1.2.4 // indirect
+	go.uber.org/zap v1.25.0 // indirect
+)
 
 require (
 	github.com/bitly/go-simplejson v0.5.1 // indirect

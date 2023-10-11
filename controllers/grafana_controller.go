@@ -4,6 +4,7 @@ package controllers
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/go-logr/logr"
 	grafanactrl "github.com/grafana-operator/grafana-operator/v5/controllers"
@@ -62,7 +63,7 @@ func (r *GrafanaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *GrafanaDashboardReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
-	r.Log = mgr.GetLogger().WithName("controllers").WithName("GrafanaDashboard").V(int(zapcore.WarnLevel))
+	r.Log = mgr.GetLogger().WithName("controllers").WithName("GrafanaDashboard").V(int(slog.LevelWarn))
 
 	gc := grafanactrl.GrafanaDashboardReconciler{
 		Client: r.Client,
@@ -76,7 +77,7 @@ func (r *GrafanaDashboardReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *GrafanaDatasourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
-	r.Log = mgr.GetLogger().WithName("controllers").WithName("GrafanaDatasource").V(int(zapcore.WarnLevel))
+	r.Log = mgr.GetLogger().WithName("controllers").WithName("GrafanaDatasource").V(int(slog.LevelWarn))
 
 	gc := &grafanactrl.GrafanaDatasourceReconciler{
 		Client: r.Client,
