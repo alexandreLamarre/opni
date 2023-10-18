@@ -154,21 +154,23 @@ require (
 	gopkg.in/square/go-jose.v2 v2.6.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.27.4
-	k8s.io/apiextensions-apiserver v0.27.2
-	k8s.io/apimachinery v0.27.4
+	k8s.io/api v0.28.1
+	k8s.io/apiextensions-apiserver v0.28.0
+	k8s.io/apimachinery v0.28.1
 	k8s.io/cli-runtime v0.27.1
-	k8s.io/client-go v0.27.3
-	k8s.io/component-base v0.27.2
+	k8s.io/client-go v0.28.1
+	k8s.io/component-base v0.28.1
 	k8s.io/kubectl v0.27.1
 	opensearch.opster.io v0.0.0-00010101000000-000000000000
-	sigs.k8s.io/controller-runtime v0.15.0
+	sigs.k8s.io/controller-runtime v0.16.1
 	sigs.k8s.io/node-feature-discovery-operator v0.2.1-0.20230131182250-99b8584e2745
 	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/google/gnostic-models v0.6.8 // indirect
+	github.com/grafana-operator/grafana-operator/v5 v5.4.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mostynb/go-grpc-compression v1.1.19 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
@@ -258,7 +260,7 @@ require (
 	github.com/connesc/cipherio v0.2.1 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/containerd/containerd v1.7.2 // indirect
-	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cppforlife/go-patch v0.2.0 // indirect
 	github.com/creasty/defaults v1.7.0 // indirect
@@ -550,7 +552,7 @@ require (
 	golang.org/x/sys v0.12.0
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/api v0.132.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230815205213-6bfd019c3878 // indirect
@@ -561,9 +563,9 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	helm.sh/helm/v3 v3.12.0 // indirect
-	k8s.io/apiserver v0.27.2 // indirect
+	k8s.io/apiserver v0.28.1 // indirect
 	k8s.io/klog/v2 v2.100.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20230525220651-2546d827e515 // indirect
+	k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 // indirect
 	k8s.io/utils v0.0.0-20230711102312-30195339c3c7 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
 	oras.land/oras-go v1.2.4-0.20230710032925-ae22fd053bb5 // indirect

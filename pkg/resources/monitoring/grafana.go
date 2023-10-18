@@ -8,7 +8,7 @@ import (
 
 	_ "embed"
 
-	grafanav1alpha1 "github.com/grafana-operator/grafana-operator/v4/api/integreatly/v1alpha1"
+	grafanav1beta1 "github.com/grafana-operator/grafana-operator/v5/api/v1beta1"
 	"github.com/imdario/mergo"
 	"github.com/rancher/opni/pkg/auth/openid"
 	"github.com/rancher/opni/pkg/config/v1beta1"
@@ -53,13 +53,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		},
 	}
 
-	grafana := &grafanav1alpha1.Grafana{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "opni",
-			Namespace: r.mc.Namespace,
-		},
-	}
-	datasource := &grafanav1alpha1.GrafanaDataSource{
+	grafana := &grafanav1beta1.Grafana{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "opni",
 			Namespace: r.mc.Namespace,
@@ -67,13 +61,13 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 	}
 
 	legacyResources := []resources.Resource{
-		resources.Absent(&grafanav1alpha1.Grafana{
+		resources.Absent(&grafanav1beta1.Grafana{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "opni-monitoring",
 				Namespace: r.mc.Namespace,
 			},
 		}),
-		resources.Absent(&grafanav1alpha1.GrafanaDataSource{
+		resources.Absent(&grafanav1beta1.GrafanaDatasource{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "opni-monitoring",
 				Namespace: r.mc.Namespace,
@@ -81,14 +75,67 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		}),
 	}
 
-	grafanaDashboards := []*grafanav1alpha1.GrafanaDashboard{
+	opniDatasourceJSONCfg, err := createDatasourceJSONData()
+	if err != nil {
+		return nil, err
+	}
+	opniDatasourceSecureJSONCfg, err := createDatasourceSecureJSONData()
+	if err != nil {
+		return nil, err
+	}
+
+	opniDatasource := &grafanav1beta1.GrafanaDatasource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "opni",
+			Namespace: r.mc.Namespace,
+		},
+		Spec: grafanav1beta1.GrafanaDatasourceSpec{
+			Datasource: &grafanav1beta1.GrafanaDatasourceInternal{
+				Name:   "Opni",
+				Type:   "prometheus",
+				Access: "proxy",
+				URL:    fmt.Sprintf("https://opni-internal.%s.svc:8080/api/prom", r.mc.Namespace),
+				// WithCredentials: lo.toPtr(true),
+				Editable:       lo.ToPtr(false),
+				IsDefault:      lo.ToPtr(true),
+				JSONData:       opniDatasourceJSONCfg,
+				SecureJSONData: opniDatasourceSecureJSONCfg,
+			},
+		},
+	}
+
+	opniAlertManagerDatasourceJSONCfg, err := createAlertManagerDatasourceJSONData()
+	if err != nil {
+		return nil, err
+	}
+
+	opniAlertManagerDatasource := &grafanav1beta1.GrafanaDatasource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "opni",
+			Namespace: r.mc.Namespace,
+		},
+		Spec: grafanav1beta1.GrafanaDatasourceSpec{
+			Datasource: &grafanav1beta1.GrafanaDatasourceInternal{
+				Name:   "Opni Alertmanager",
+				Type:   "opni_alertmanager",
+				Access: "proxy",
+				URL:    fmt.Sprintf("https://opni-internal.%s.svc:8080/api/prom", r.mc.Namespace),
+				// WithCredentials: lo.toPtr(true),
+				Editable:       lo.ToPtr(false),
+				JSONData:       opniAlertManagerDatasourceJSONCfg,
+				SecureJSONData: opniDatasourceSecureJSONCfg,
+			},
+		},
+	}
+
+	grafanaDashboards := []*grafanav1beta1.GrafanaDashboard{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "opni-gateway.json",
 				Namespace: r.mc.Namespace,
 				Labels:    dashboardSelector.MatchLabels,
 			},
-			Spec: grafanav1alpha1.GrafanaDashboardSpec{
+			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(opniGatewayJson),
 			},
 		},
@@ -98,9 +145,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				Namespace: r.mc.Namespace,
 				Labels:    dashboardSelector.MatchLabels,
 			},
-			Spec: grafanav1alpha1.GrafanaDashboardSpec{
-				Json:               string(homeDashboardJson),
-				UseAsHomeDashboard: true,
+			Spec: grafanav1beta1.GrafanaDashboardSpec{
+				Json: string(homeDashboardJson),
+				//UseAsHomeDashboard: true,
 			},
 		},
 		{
@@ -109,7 +156,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				Namespace: r.mc.Namespace,
 				Labels:    dashboardSelector.MatchLabels,
 			},
-			Spec: grafanav1alpha1.GrafanaDashboardSpec{
+			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(serviceLatencyDashboardJson),
 			},
 		},
@@ -119,7 +166,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				Namespace: r.mc.Namespace,
 				Labels:    dashboardSelector.MatchLabels,
 			},
-			Spec: grafanav1alpha1.GrafanaDashboardSpec{
+			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(sloOverviewDashboard),
 			},
 		},
@@ -129,7 +176,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				Namespace: r.mc.Namespace,
 				Labels:    dashboardSelector.MatchLabels,
 			},
-			Spec: grafanav1alpha1.GrafanaDashboardSpec{
+			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(sloDetailedDashboard),
 			},
 		},
@@ -140,13 +187,13 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		return nil, err
 	}
 	for name, jsonData := range dashboards {
-		grafanaDashboards = append(grafanaDashboards, &grafanav1alpha1.GrafanaDashboard{
+		grafanaDashboards = append(grafanaDashboards, &grafanav1beta1.GrafanaDashboard{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: r.mc.Namespace,
 				Labels:    dashboardSelector.MatchLabels,
 			},
-			Spec: grafanav1alpha1.GrafanaDashboardSpec{
+			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(jsonData),
 			},
 		})
@@ -155,7 +202,8 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 	if !r.mc.Spec.Grafana.GetEnabled() {
 		absentResources := append([]resources.Resource{
 			resources.Absent(grafana),
-			resources.Absent(datasource),
+			resources.Absent(opniDatasource),
+			resources.Absent(opniAlertManagerDatasource),
 		}, legacyResources...)
 		for _, dashboard := range grafanaDashboards {
 			absentResources = append(absentResources, resources.Absent(dashboard))
@@ -180,53 +228,47 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		return nil, fmt.Errorf("invalid grafana hostname: %w", err)
 	}
 
-	tag := "10.1.1"
+	tag := grafanaImageVersion
 	if r.mc.Spec.Grafana.GetVersion() != "" {
 		tag = strings.TrimSpace(r.mc.Spec.Grafana.GetVersion())
 	}
 
-	defaults := grafanav1alpha1.GrafanaSpec{
-		DashboardLabelSelector: []*metav1.LabelSelector{dashboardSelector},
-		BaseImage:              "grafana/grafana:" + tag,
-		Client: &grafanav1alpha1.GrafanaClient{
-			PreferService: lo.ToPtr(true),
+	defaults := grafanav1beta1.GrafanaSpec{
+		Client: &grafanav1beta1.GrafanaClient{
+			PreferIngress: lo.ToPtr(false),
 		},
-		Config: grafanav1alpha1.GrafanaConfig{
-			Server: &grafanav1alpha1.GrafanaConfigServer{
-				Domain:  grafanaHostname,
-				RootUrl: "https://" + grafanaHostname,
-			},
-			Auth: &grafanav1alpha1.GrafanaConfigAuth{
-				DisableLoginForm: lo.ToPtr(true),
-			},
-			AuthGenericOauth: &grafanav1alpha1.GrafanaConfigAuthGenericOauth{
-				Enabled: lo.ToPtr(true),
-				Scopes:  "openid profile email",
-			},
-			UnifiedAlerting: &grafanav1alpha1.GrafanaConfigUnifiedAlerting{
-				Enabled: lo.ToPtr(true),
-			},
-			Alerting: &grafanav1alpha1.GrafanaConfigAlerting{
-				Enabled: lo.ToPtr(false),
-			},
-			FeatureToggles: &grafanav1alpha1.GrafanaConfigFeatureToggles{
-				Enable: "accessTokenExpirationCheck panelTitleSearch increaseInMemDatabaseQueryCache newPanelChromeUI",
-			},
-		},
-		Deployment: &grafanav1alpha1.GrafanaDeployment{
-			SecurityContext: &corev1.PodSecurityContext{
-				FSGroup: lo.ToPtr(int64(472)),
-			},
-			Env: []corev1.EnvVar{
-				{
-					Name:  "GF_INSTALL_PLUGINS",
-					Value: "grafana-polystat-panel,marcusolsson-treemap-panel",
+		Config: createDefaultGrafanaIni(grafanaHostname),
+		Deployment: &grafanav1beta1.DeploymentV1{
+			Spec: grafanav1beta1.DeploymentV1Spec{
+				Template: &grafanav1beta1.DeploymentV1PodTemplateSpec{
+					Spec: &grafanav1beta1.DeploymentV1PodSpec{
+						Containers: []corev1.Container{
+							{
+								Image: grafanaImageRepo + "/grafana:" + tag,
+								Env: []corev1.EnvVar{
+									{
+										Name:  "GF_INSTALL_PLUGINS",
+										Value: "grafana-polystat-panel,marcusolsson-treemap-panel",
+									},
+								},
+							},
+						},
+						SecurityContext: &corev1.PodSecurityContext{
+							FSGroup: lo.ToPtr(int64(472)),
+						},
+					},
 				},
 			},
 		},
-		Secrets: []string{"opni-gateway-client-cert"},
-		DataStorage: &grafanav1alpha1.GrafanaDataStorage{
-			Size: resource.MustParse("10Gi"),
+		// Secrets: []string{"opni-gateway-client-cert"},
+		PersistentVolumeClaim: &grafanav1beta1.PersistentVolumeClaimV1{
+			Spec: &grafanav1beta1.PersistentVolumeClaimV1Spec{
+				Resources: &corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			},
 		},
 	}
 
@@ -239,66 +281,24 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 	}
 
 	// special case as we don't want the append slice logic for access modes
-	if spec.DataStorage.AccessModes == nil {
-		spec.DataStorage.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
+	if spec.PersistentVolumeClaim.Spec.AccessModes == nil {
+		spec.PersistentVolumeClaim.Spec.AccessModes = []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce}
 	}
 
 	// special case to fill the ingress hostname if not set
-	if spec.Ingress != nil {
-		if spec.Ingress.Hostname == "" {
-			spec.Ingress.Hostname = grafanaHostname
+	if spec.Ingress != nil && spec.Ingress.Spec != nil {
+		for _, rule := range spec.Ingress.Spec.Rules {
+			if rule.Host == "" {
+				rule.Host = grafanaHostname
+			}
 		}
 	}
 
 	grafana.Spec = spec
 
-	datasource.Spec = grafanav1alpha1.GrafanaDataSourceSpec{
-		Name: "opni-datasources",
-		Datasources: []grafanav1alpha1.GrafanaDataSourceFields{
-			{
-				Name:            "Opni",
-				Type:            "prometheus",
-				Access:          "proxy",
-				Url:             fmt.Sprintf("https://opni-internal.%s.svc:8080/api/prom", r.mc.Namespace),
-				WithCredentials: true,
-				Editable:        false,
-				IsDefault:       true,
-				JsonData: grafanav1alpha1.GrafanaDataSourceJsonData{
-					AlertManagerUID:   "opni_alertmanager",
-					OauthPassThru:     true,
-					TlsAuthWithCACert: true,
-				},
-				SecureJsonData: grafanav1alpha1.GrafanaDataSourceSecureJsonData{
-					TlsCaCert:     "$__file{/etc/grafana-secrets/opni-gateway-client-cert/ca.crt}",
-					TlsClientCert: "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.crt}",
-					TlsClientKey:  "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.key}",
-				},
-			},
-			{
-				Name:            "Opni Alertmanager",
-				Uid:             "opni_alertmanager",
-				Type:            "alertmanager",
-				Access:          "proxy",
-				Url:             fmt.Sprintf("https://opni-internal.%s.svc:8080/api/prom", r.mc.Namespace),
-				WithCredentials: true,
-				Editable:        false,
-				JsonData: grafanav1alpha1.GrafanaDataSourceJsonData{
-					Implementation:    "cortex",
-					TlsAuthWithCACert: true,
-					OauthPassThru:     true,
-				},
-				SecureJsonData: grafanav1alpha1.GrafanaDataSourceSecureJsonData{
-					TlsCaCert:     "$__file{/etc/grafana-secrets/opni-gateway-client-cert/ca.crt}",
-					TlsClientCert: "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.crt}",
-					TlsClientKey:  "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.key}",
-				},
-			},
-		},
-	}
-
 	switch gatewayAuthProvider {
 	case v1beta1.AuthProviderNoAuth:
-		grafana.Spec.Config.AuthGenericOauth = &grafanav1alpha1.GrafanaConfigAuthGenericOauth{
+		grafana.Spec.Config.AuthGenericOauth = &grafanav1beta1.GrafanaConfigAuthGenericOauth{
 			Enabled:           lo.ToPtr(true),
 			ClientId:          "grafana",
 			ClientSecret:      "noauth",
@@ -321,7 +321,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		if len(scopes) == 0 {
 			scopes = []string{"openid", "profile", "email"}
 		}
-		grafana.Spec.Config.AuthGenericOauth = &grafanav1alpha1.GrafanaConfigAuthGenericOauth{
+		grafana.Spec.Config.AuthGenericOauth = &grafanav1beta1.GrafanaConfigAuthGenericOauth{
 			Enabled:               lo.ToPtr(true),
 			ClientId:              spec.ClientID,
 			ClientSecret:          spec.ClientSecret,
@@ -349,11 +349,13 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 	}
 
 	controllerutil.SetOwnerReference(r.mc, grafana, r.client.Scheme())
-	controllerutil.SetOwnerReference(r.mc, datasource, r.client.Scheme())
+	controllerutil.SetOwnerReference(r.mc, opniDatasource, r.client.Scheme())
+	controllerutil.SetOwnerReference(r.mc, opniAlertManagerDatasource, r.client.Scheme())
 
 	presentResources := []resources.Resource{
 		resources.Present(grafana),
-		resources.Present(datasource),
+		resources.Present(opniDatasource),
+		resources.Present(opniAlertManagerDatasource),
 	}
 	for _, dashboard := range grafanaDashboards {
 		controllerutil.SetOwnerReference(r.mc, dashboard, r.client.Scheme())
@@ -361,4 +363,74 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 	}
 
 	return append(presentResources, legacyResources...), nil
+}
+
+func createDefaultGrafanaIni(grafanaHostname string) map[string]map[string]string {
+	config := make(map[string]map[string]string)
+
+	serverSection := make(map[string]string)
+	serverSection["domain"] = grafanaHostname
+	serverSection["root_url"] = "https://" + grafanaHostname
+	config["server"] = serverSection
+
+	authSection := make(map[string]string)
+	authSection["disable_login_form"] = "true"
+	config["auth"] = authSection
+
+	oauthSection := make(map[string]string)
+	oauthSection["enabled"] = "true"
+	oauthSection["scopes"] = "openid profile email"
+	config["authGenericOauth"] = oauthSection
+
+	unifiedAlertingSection := make(map[string]string)
+	unifiedAlertingSection["enabled"] = "true"
+	config["unified_alerting"] = unifiedAlertingSection
+
+	alertingSection := make(map[string]string)
+	alertingSection["enabled"] = "false"
+	config["alerting"] = alertingSection
+
+	featureTogglesSection := make(map[string]string)
+	featureTogglesSection["enable"] = "accessTokenExpirationCheck panelTitleSearch increaseInMemDatabaseQueryCache newPanelChromeUI"
+	config["feature_toggles"] = featureTogglesSection
+	return config
+}
+
+func createDatasourceJSONData() (json.RawMessage, error) {
+	datasourceCfg := make(map[string]any)
+	datasourceCfg["alertmanagerUid"] = "opni_alertmanager"
+	datasourceCfg["oauthPassThru"] = "true"
+	datasourceCfg["TlsAuthWithCACert"] = "true"
+
+	jsonData, err := json.Marshal(datasourceCfg)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(jsonData), nil
+}
+
+func createAlertManagerDatasourceJSONData() (json.RawMessage, error) {
+	datasourceCfg := make(map[string]any)
+	datasourceCfg["implementation"] = "cortex"
+	datasourceCfg["oauthPassThru"] = "true"
+	datasourceCfg["TlsAuthWithCACert"] = "true"
+
+	jsonData, err := json.Marshal(datasourceCfg)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(jsonData), nil
+}
+
+func createDatasourceSecureJSONData() (json.RawMessage, error) {
+	datasourceSecureCfg := make(map[string]any)
+	datasourceSecureCfg["tlsCACert"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/ca.crt}"
+	datasourceSecureCfg["TlsClientCert"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.crt}"
+	datasourceSecureCfg["TlsClientKey"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.key}"
+
+	jsonData, err := json.Marshal(datasourceSecureCfg)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(jsonData), nil
 }
