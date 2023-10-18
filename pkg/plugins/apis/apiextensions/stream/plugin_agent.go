@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	"github.com/jhump/protoreflect/grpcreflect"
 	"github.com/kralicky/totem"
+	controlv1 "github.com/rancher/opni/pkg/apis/control/v1"
 	streamv1 "github.com/rancher/opni/pkg/apis/stream/v1"
 	"github.com/rancher/opni/pkg/logger"
 	"github.com/rancher/opni/pkg/plugins/apis/apiextensions"
@@ -154,6 +155,10 @@ func (e *agentStreamExtensionServerImpl) Connect(stream streamv1.Stream_ConnectS
 		e.logger.Debug("stream client is now available")
 		if e.clientHandler != nil {
 			e.clientHandler.UseStreamClient(cc)
+			err := initRemotePluginLoggers(stream.Context(), cc)
+			if err != nil {
+				e.logger.Warn("could not initialize remote log streaming", logger.Err(err))
+			}
 		}
 	case err := <-errC:
 		if err != nil {
@@ -207,4 +212,14 @@ func (e *agentStreamExtensionServerImpl) Notify(_ context.Context, event *stream
 		}
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func initRemotePluginLoggers(ctx context.Context, cc grpc.ClientConnInterface) error {
+	identityClient := controlv1.NewIdentityClient(cc)
+	id, err := identityClient.Whoami(ctx, &emptypb.Empty{})
+	if err != nil {
+		return err
+	}
+	logger.InitPluginWriter(id.GetId())
+	return nil
 }

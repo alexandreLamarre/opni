@@ -6,14 +6,21 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/logr/slogr"
-	"github.com/kralicky/gpkg/sync"
+	gpkgsync "github.com/kralicky/gpkg/sync"
 	slogmulti "github.com/samber/slog-multi"
 	slogsampling "github.com/samber/slog-sampling"
 	"github.com/spf13/afero"
+)
+
+const (
+	pluginGroupPrefix = "plugin"
+	NoRepeatInterval  = 3600 * time.Hour // arbitrarily long time to denote one-time sampling
+	errKey            = "err"
 )
 
 var (
@@ -25,17 +32,16 @@ var (
     /_/
  Observability + AIOps for Kubernetes
 `
-	DefaultLogLevel   = slog.LevelDebug
-	DefaultWriter     io.Writer
-	DefaultAddSource  = true
-	pluginGroupPrefix = "plugin"
-	NoRepeatInterval  = 3600 * time.Hour // arbitrarily long time to denote one-time sampling
-	logFs             afero.Fs
-	DefaultTimeFormat = "2006 Jan 02 15:04:05"
-	errKey            = "err"
+	DefaultLogLevel    = slog.LevelDebug
+	DefaultWriter      io.Writer
+	DefaultAddSource   = true
+	logFs              afero.Fs
+	DefaultTimeFormat  = "2006 Jan 02 15:04:05"
+	logSampler         = &sampler{}
+	sharedPluginWriter = &fileWriter{
+		mu: &sync.Mutex{},
+	}
 )
-
-var logSampler = &sampler{}
 
 func init() {
 	logFs = afero.NewMemMapFs()
@@ -224,7 +230,7 @@ func NewPluginLogger(opts ...LoggerOption) *slog.Logger {
 }
 
 type sampler struct {
-	dropped sync.Map[string, uint64]
+	dropped gpkgsync.Map[string, uint64]
 }
 
 func (s *sampler) onDroppedHook(_ context.Context, r slog.Record) {
@@ -245,14 +251,6 @@ func WriteOnlyFile(clusterID string) afero.File {
 	f, err := logFs.OpenFile(clusterID, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		panic(err)
-	}
-	return f
-}
-
-func GetFileIfExists(clusterID string) afero.File {
-	f, err := logFs.Open(clusterID)
-	if err != nil {
-		return nil
 	}
 	return f
 }
