@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	_ "embed"
@@ -298,16 +299,18 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 
 	switch gatewayAuthProvider {
 	case v1beta1.AuthProviderNoAuth:
-		grafana.Spec.Config.AuthGenericOauth = &grafanav1beta1.GrafanaConfigAuthGenericOauth{
-			Enabled:           lo.ToPtr(true),
-			ClientId:          "grafana",
-			ClientSecret:      "noauth",
-			Scopes:            "openid profile email",
-			AuthUrl:           fmt.Sprintf("http://%s:4000/oauth2/authorize", gatewayHostname),
-			TokenUrl:          fmt.Sprintf("http://%s:4000/oauth2/token", gatewayHostname),
-			ApiUrl:            fmt.Sprintf("http://%s:4000/oauth2/userinfo", gatewayHostname),
-			RoleAttributePath: "grafana_role",
+		grafanaAuthGenericOauthCfg := map[string]string{
+			"enabled":             "true",
+			"client_id":           "grafana",
+			"client_secret":       "noauth",
+			"scopes":              "openid profile email",
+			"auth_url":            fmt.Sprintf("http://%s:4000/oauth2/authorize", gatewayHostname),
+			"token_url":           fmt.Sprintf("http://%s:4000/oauth2/token", gatewayHostname),
+			"api_url":             fmt.Sprintf("http://%s:4000/oauth2/userinfo", gatewayHostname),
+			"role_attribute_path": "grafana_role",
 		}
+		grafana.Spec.Config["auth.generic_oauth"] = grafanaAuthGenericOauthCfg
+
 	case v1beta1.AuthProviderOpenID:
 		spec := r.gw.Spec.Auth.Openid
 		if spec.Discovery == nil && spec.WellKnownConfiguration == nil {
@@ -330,34 +333,18 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			"token_url":                wkc.TokenEndpoint,
 			"api_url":                  wkc.UserinfoEndpoint,
 			"role_attribute_path":      spec.RoleAttributePath,
-			"allow_sign_up":            string(spec.AllowSignUp),
+			"allow_sign_up":            strconv.FormatBool(lo.FromPtrOr(spec.AllowSignUp, false)),
 			"allowed_domains":          strings.Join(spec.AllowedDomains, " "),
-			"role_attribute_strict":    spec.RoleAttributeStrict,
+			"role_attribute_strict":    strconv.FormatBool(lo.FromPtrOr(spec.RoleAttributeStrict, false)),
 			"email_attribute_path":     spec.EmailAttributePath,
-			"tls_skip_verify_insecure": spec.InsecureSkipVerify,
+			"tls_skip_verify_insecure": strconv.FormatBool(lo.FromPtrOr(spec.InsecureSkipVerify, false)),
 			"tls_client_cert":          spec.TLSClientCert,
 			"tls_client_key":           spec.TLSClientKey,
 			"tls_client_ca":            spec.TLSClientCA,
 		}
 
-		// grafana.Spec.Config.AuthGenericOauth = &grafanav1beta1.GrafanaConfigAuthGenericOauth{
-		// 	Enabled:               lo.ToPtr(true),
-		// 	ClientId:              spec.ClientID,
-		// 	ClientSecret:          spec.ClientSecret,
-		// 	Scopes:                strings.Join(scopes, " "),
-		// 	AuthUrl:               wkc.AuthEndpoint,
-		// 	TokenUrl:              wkc.TokenEndpoint,
-		// 	ApiUrl:                wkc.UserinfoEndpoint,
-		// 	RoleAttributePath:     spec.RoleAttributePath,
-		// 	AllowSignUp:           spec.AllowSignUp,
-		// 	AllowedDomains:        strings.Join(spec.AllowedDomains, " "),
-		// 	RoleAttributeStrict:   spec.RoleAttributeStrict,
-		// 	EmailAttributePath:    spec.EmailAttributePath,
-		// 	TLSSkipVerifyInsecure: spec.InsecureSkipVerify,
-		// 	TLSClientCert:         spec.TLSClientCert,
-		// 	TLSClientKey:          spec.TLSClientKey,
-		// 	TLSClientCa:           spec.TLSClientCA,
-		// }
+		grafana.Spec.Config["auth.generic_oauth"] = grafanaAuthGenericOauthCfg
+
 		if wkc.EndSessionEndpoint != "" {
 			grafana.Spec.Config["auth"]["signout_redirect_url"] = wkc.EndSessionEndpoint
 		}
@@ -453,24 +440,3 @@ func createDatasourceSecureJSONData() (json.RawMessage, error) {
 	}
 	return json.RawMessage(jsonData), nil
 }
-
-// func appendGenericOauth() {
-// 	grafanaConfig := map[string]interface{}{
-// 		"enabled":                  lo.ToPtr(true),
-// 		"client_id":                spec.ClientID,
-// 		"client_secret":            spec.ClientSecret,
-// 		"scopes":                   strings.Join(scopes, " "),
-// 		"auth_url":                 wkc.AuthEndpoint,
-// 		"token_url":                wkc.TokenEndpoint,
-// 		"api_url":                  wkc.UserinfoEndpoint,
-// 		"role_attribute_path":      spec.RoleAttributePath,
-// 		"allow_sign_up":            spec.AllowSignUp,
-// 		"allowed_domains":          strings.Join(spec.AllowedDomains, " "),
-// 		"role_attribute_strict":    spec.RoleAttributeStrict,
-// 		"email_attribute_path":     spec.EmailAttributePath,
-// 		"tls_skip_verify_insecure": spec.InsecureSkipVerify,
-// 		"tls_client_cert":          spec.TLSClientCert,
-// 		"tls_client_key":           spec.TLSClientKey,
-// 		"tls_client_ca":            spec.TLSClientCA,
-// 	}
-// }
