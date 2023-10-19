@@ -3,6 +3,7 @@ package testk8s
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"time"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -21,7 +22,7 @@ func StartManager(ctx context.Context, restConfig *rest.Config, scheme *k8srunti
 
 	manager := util.Must(ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     fmt.Sprintf(":%d", ports[0]),
+		Metrics:                server.Options{BindAddress: fmt.Sprintf(":%d", ports[0])},
 		HealthProbeBindAddress: fmt.Sprintf(":%d", ports[1]),
 	}))
 	for _, reconciler := range reconcilers {

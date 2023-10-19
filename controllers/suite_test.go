@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"strings"
 	"sync"
 	"testing"
@@ -431,7 +432,7 @@ func RunTestEnvironment(
 	// add the opnicluster manager
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                 scheme,
-		MetricsBindAddress:     fmt.Sprintf(":%d", ports[0]),
+		Metrics:                server.Options{BindAddress: fmt.Sprintf(":%d", ports[0])},
 		HealthProbeBindAddress: fmt.Sprintf(":%d", ports[1]),
 	})
 	Expect(err).NotTo(HaveOccurred())

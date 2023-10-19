@@ -89,7 +89,6 @@ func BuildClientCmd() *cobra.Command {
 				Metrics: server.Options{
 					BindAddress: metricsAddr,
 				},
-				// Port:                   9443,
 				WebhookServer: webhook.NewServer(webhook.Options{
 					Port: 9443,
 				}),
