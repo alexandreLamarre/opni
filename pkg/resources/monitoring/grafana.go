@@ -321,26 +321,45 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		if len(scopes) == 0 {
 			scopes = []string{"openid", "profile", "email"}
 		}
-		grafana.Spec.Config.AuthGenericOauth = &grafanav1beta1.GrafanaConfigAuthGenericOauth{
-			Enabled:               lo.ToPtr(true),
-			ClientId:              spec.ClientID,
-			ClientSecret:          spec.ClientSecret,
-			Scopes:                strings.Join(scopes, " "),
-			AuthUrl:               wkc.AuthEndpoint,
-			TokenUrl:              wkc.TokenEndpoint,
-			ApiUrl:                wkc.UserinfoEndpoint,
-			RoleAttributePath:     spec.RoleAttributePath,
-			AllowSignUp:           spec.AllowSignUp,
-			AllowedDomains:        strings.Join(spec.AllowedDomains, " "),
-			RoleAttributeStrict:   spec.RoleAttributeStrict,
-			EmailAttributePath:    spec.EmailAttributePath,
-			TLSSkipVerifyInsecure: spec.InsecureSkipVerify,
-			TLSClientCert:         spec.TLSClientCert,
-			TLSClientKey:          spec.TLSClientKey,
-			TLSClientCa:           spec.TLSClientCA,
+		grafanaAuthGenericOauthCfg := map[string]string{
+			"enabled":                  "true",
+			"client_id":                spec.ClientID,
+			"client_secret":            spec.ClientSecret,
+			"scopes":                   strings.Join(scopes, " "),
+			"auth_url":                 wkc.AuthEndpoint,
+			"token_url":                wkc.TokenEndpoint,
+			"api_url":                  wkc.UserinfoEndpoint,
+			"role_attribute_path":      spec.RoleAttributePath,
+			"allow_sign_up":            string(spec.AllowSignUp),
+			"allowed_domains":          strings.Join(spec.AllowedDomains, " "),
+			"role_attribute_strict":    spec.RoleAttributeStrict,
+			"email_attribute_path":     spec.EmailAttributePath,
+			"tls_skip_verify_insecure": spec.InsecureSkipVerify,
+			"tls_client_cert":          spec.TLSClientCert,
+			"tls_client_key":           spec.TLSClientKey,
+			"tls_client_ca":            spec.TLSClientCA,
 		}
+
+		// grafana.Spec.Config.AuthGenericOauth = &grafanav1beta1.GrafanaConfigAuthGenericOauth{
+		// 	Enabled:               lo.ToPtr(true),
+		// 	ClientId:              spec.ClientID,
+		// 	ClientSecret:          spec.ClientSecret,
+		// 	Scopes:                strings.Join(scopes, " "),
+		// 	AuthUrl:               wkc.AuthEndpoint,
+		// 	TokenUrl:              wkc.TokenEndpoint,
+		// 	ApiUrl:                wkc.UserinfoEndpoint,
+		// 	RoleAttributePath:     spec.RoleAttributePath,
+		// 	AllowSignUp:           spec.AllowSignUp,
+		// 	AllowedDomains:        strings.Join(spec.AllowedDomains, " "),
+		// 	RoleAttributeStrict:   spec.RoleAttributeStrict,
+		// 	EmailAttributePath:    spec.EmailAttributePath,
+		// 	TLSSkipVerifyInsecure: spec.InsecureSkipVerify,
+		// 	TLSClientCert:         spec.TLSClientCert,
+		// 	TLSClientKey:          spec.TLSClientKey,
+		// 	TLSClientCa:           spec.TLSClientCA,
+		// }
 		if wkc.EndSessionEndpoint != "" {
-			grafana.Spec.Config.Auth.SignoutRedirectUrl = wkc.EndSessionEndpoint
+			grafana.Spec.Config["auth"]["signout_redirect_url"] = wkc.EndSessionEndpoint
 		}
 
 		if spec.InsecureSkipVerify != nil && *spec.InsecureSkipVerify {
@@ -434,3 +453,24 @@ func createDatasourceSecureJSONData() (json.RawMessage, error) {
 	}
 	return json.RawMessage(jsonData), nil
 }
+
+// func appendGenericOauth() {
+// 	grafanaConfig := map[string]interface{}{
+// 		"enabled":                  lo.ToPtr(true),
+// 		"client_id":                spec.ClientID,
+// 		"client_secret":            spec.ClientSecret,
+// 		"scopes":                   strings.Join(scopes, " "),
+// 		"auth_url":                 wkc.AuthEndpoint,
+// 		"token_url":                wkc.TokenEndpoint,
+// 		"api_url":                  wkc.UserinfoEndpoint,
+// 		"role_attribute_path":      spec.RoleAttributePath,
+// 		"allow_sign_up":            spec.AllowSignUp,
+// 		"allowed_domains":          strings.Join(spec.AllowedDomains, " "),
+// 		"role_attribute_strict":    spec.RoleAttributeStrict,
+// 		"email_attribute_path":     spec.EmailAttributePath,
+// 		"tls_skip_verify_insecure": spec.InsecureSkipVerify,
+// 		"tls_client_cert":          spec.TLSClientCert,
+// 		"tls_client_key":           spec.TLSClientKey,
+// 		"tls_client_ca":            spec.TLSClientCA,
+// 	}
+// }
