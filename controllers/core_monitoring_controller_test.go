@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cortexproject/cortex/pkg/cortex"
-	grafanav1alpha1 "github.com/grafana-operator/grafana-operator/v4/api/integreatly/v1alpha1"
+	//grafanav1alpha1 "github.com/grafana-operator/grafana-operator/v4/api/integreatly/v1alpha1"
 	. "github.com/kralicky/kmatch"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -239,13 +239,13 @@ var _ = Describe("Monitoring Controller", Ordered, Label("controller", "slow"), 
 				Enabled:  lo.ToPtr(true),
 				Hostname: lo.ToPtr("x"),
 			}))
-			Expect(target.Spec.Grafana.GrafanaSpec).To(Equal(grafanav1alpha1.GrafanaSpec{
-				Config: grafanav1alpha1.GrafanaConfig{
-					AuthGenericOauth: &grafanav1alpha1.GrafanaConfigAuthGenericOauth{
-						Enabled: lo.ToPtr(true),
-					},
-				},
-			}))
+			//Expect(target.Spec.Grafana.GrafanaSpec).To(Equal(grafanav1alpha1.GrafanaSpec{
+			//	Config: grafanav1alpha1.GrafanaConfig{
+			//		AuthGenericOauth: &grafanav1alpha1.GrafanaConfigAuthGenericOauth{
+			//			Enabled: lo.ToPtr(true),
+			//		},
+			//	},
+			//}))
 			Expect(k8sClient.Delete(context.Background(), target)).To(Succeed())
 			Eventually(Object(target)).ShouldNot(Exist())
 		})

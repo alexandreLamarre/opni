@@ -6,15 +6,8 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	grafanav1alpha1 "github.com/grafana-operator/grafana-operator/v4/api/integreatly/v1alpha1"
-	grafanaconfig "github.com/grafana-operator/grafana-operator/v4/controllers/config"
-	"github.com/grafana-operator/grafana-operator/v4/controllers/grafana"
-	"github.com/grafana-operator/grafana-operator/v4/controllers/grafanadashboard"
-	"github.com/grafana-operator/grafana-operator/v4/controllers/grafanadatasource"
+	grafanactrl "github.com/grafana-operator/grafana-operator/v5/controllers"
 	"go.uber.org/zap/zapcore"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,27 +49,14 @@ func (r *GrafanaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
 	r.Log = mgr.GetLogger().WithName("controllers").WithName("Grafana").V(int(zapcore.WarnLevel))
-	ctx, ca := context.WithCancel(context.Background())
-	gc := &grafana.ReconcileGrafana{
-		Client:   r.Client,
-		Scheme:   r.scheme,
-		Plugins:  grafana.NewPluginsHelper(),
-		Context:  ctx,
-		Cancel:   ca,
-		Config:   grafanaconfig.GetControllerConfig(),
-		Log:      r.Log,
-		Recorder: mgr.GetEventRecorderFor("GrafanaDashboard"),
+
+	gc := &grafanactrl.GrafanaReconciler{
+		Client: r.Client,
+		Scheme: r.scheme,
+		Log:    r.Log,
 	}
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&grafanav1alpha1.Grafana{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.ServiceAccount{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&corev1.Service{}).
-		Owns(&networkingv1.Ingress{}).
-		Complete(gc)
+
+	return gc.SetupWithManager(mgr)
 }
 
 func (r *GrafanaDashboardReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -84,24 +64,25 @@ func (r *GrafanaDashboardReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.scheme = mgr.GetScheme()
 	r.Log = mgr.GetLogger().WithName("controllers").WithName("GrafanaDashboard").V(int(zapcore.WarnLevel))
 
-	reconciler := grafanadashboard.NewReconciler(mgr)
-	reconciler.(*grafanadashboard.GrafanaDashboardReconciler).Log = r.Log
+	gc := grafanactrl.GrafanaDashboardReconciler{
+		Client: r.Client,
+		Scheme: r.scheme,
+		Log:    r.Log,
+	}
 
-	return grafanadashboard.SetupWithManager(mgr, reconciler, "")
+	return gc.SetupWithManager(mgr, context.Background())
 }
 
 func (r *GrafanaDatasourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
 	r.Log = mgr.GetLogger().WithName("controllers").WithName("GrafanaDatasource").V(int(zapcore.WarnLevel))
-	ctx, ca := context.WithCancel(context.Background())
-	gc := &grafanadatasource.GrafanaDatasourceReconciler{
-		Client:   r.Client,
-		Scheme:   r.scheme,
-		Logger:   r.Log,
-		Context:  ctx,
-		Cancel:   ca,
-		Recorder: mgr.GetEventRecorderFor("GrafanaDatasource"),
+
+	gc := &grafanactrl.GrafanaDatasourceReconciler{
+		Client: r.Client,
+		Scheme: r.scheme,
+		Log:    r.Log,
 	}
-	return gc.SetupWithManager(mgr)
+
+	return gc.SetupWithManager(mgr, context.Background())
 }
