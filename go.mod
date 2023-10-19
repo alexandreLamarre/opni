@@ -137,7 +137,6 @@ require (
 	go.uber.org/atomic v1.11.0
 	go.uber.org/mock v0.2.0
 	go.uber.org/multierr v1.11.0
-	go.uber.org/zap v1.25.0
 	golang.org/x/crypto v0.12.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
 	golang.org/x/mod v0.12.0
@@ -168,10 +167,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
-require (
-	github.com/go-logr/zapr v1.2.4 // indirect
-	go.uber.org/zap v1.25.0 // indirect
-)
+require github.com/go-logr/zapr v1.2.4 // indirect
 
 require (
 	github.com/bitly/go-simplejson v0.5.1 // indirect
@@ -194,6 +190,7 @@ require (
 	go.opentelemetry.io/collector/config/configtls v0.80.0 // indirect
 	go.opentelemetry.io/collector/config/internal v0.80.0 // indirect
 	go.opentelemetry.io/collector/extension/auth v0.80.0 // indirect
+	go.uber.org/zap v1.25.0 // indirect
 )
 
 require (

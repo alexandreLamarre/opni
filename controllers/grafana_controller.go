@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-logr/logr"
 	grafanactrl "github.com/grafana-operator/grafana-operator/v5/controllers"
-	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,7 +48,7 @@ type GrafanaDatasourceReconciler struct {
 func (r *GrafanaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Client = mgr.GetClient()
 	r.scheme = mgr.GetScheme()
-	r.Log = mgr.GetLogger().WithName("controllers").WithName("Grafana").V(int(zapcore.WarnLevel))
+	r.Log = mgr.GetLogger().WithName("controllers").WithName("Grafana").V(int(slog.LevelWarn))
 
 	gc := &grafanactrl.GrafanaReconciler{
 		Client: r.Client,
