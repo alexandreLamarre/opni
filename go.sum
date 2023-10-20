@@ -1395,6 +1395,8 @@ github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWm
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/gosuri/uitable v0.0.4 h1:IG2xLKRvErL3uhY6e1BylFzG+aJiwQviDDTfOKeKTpY=
 github.com/gosuri/uitable v0.0.4/go.mod h1:tKR86bXuXPZazfOTG1FIzvjIdXzd0mo4Vtn16vt0PJo=
+github.com/grafana-operator/grafana-operator/v4 v4.10.1 h1:9TSZhuMh6b64frhTa8eb+jBEw0oZp076Bh990Ts2WqU=
+github.com/grafana-operator/grafana-operator/v4 v4.10.1/go.mod h1:k69wJcXVrqAcZBoGuh5LSqz0ak8LlVOxxqp0W3f/4V8=
 github.com/grafana/grafana-api-golang-client v0.23.0 h1:Uta0dSkxWYf1D83/E7MRLCG69387FiUc+k9U/35nMhY=
 github.com/grafana/grafana-api-golang-client v0.23.0/go.mod h1:24W29gPe9yl0/3A9X624TPkAOR8DpHno490cPwnkv8E=
 github.com/grafana/memberlist v0.3.1-0.20220714140823-09ffed8adbbe h1:yIXAAbLswn7VNWBIvM71O2QsgfgW9fRXZNR0DXe6pDU=
