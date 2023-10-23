@@ -58,6 +58,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "opni",
 			Namespace: r.mc.Namespace,
+			Labels:    dashboardSelector.MatchLabels,
 		},
 	}
 
@@ -138,6 +139,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(opniGatewayJson),
+				InstanceSelector: &metav1.LabelSelector{
+					MatchLabels: dashboardSelector.MatchLabels,
+				},
 			},
 		},
 		{
@@ -148,6 +152,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(homeDashboardJson),
+				InstanceSelector: &metav1.LabelSelector{
+					MatchLabels: dashboardSelector.MatchLabels,
+				},
 				//UseAsHomeDashboard: true,
 			},
 		},
@@ -159,6 +166,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(serviceLatencyDashboardJson),
+				InstanceSelector: &metav1.LabelSelector{
+					MatchLabels: dashboardSelector.MatchLabels,
+				},
 			},
 		},
 		{
@@ -169,6 +179,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(sloOverviewDashboard),
+				InstanceSelector: &metav1.LabelSelector{
+					MatchLabels: dashboardSelector.MatchLabels,
+				},
 			},
 		},
 		{
@@ -179,6 +192,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(sloDetailedDashboard),
+				InstanceSelector: &metav1.LabelSelector{
+					MatchLabels: dashboardSelector.MatchLabels,
+				},
 			},
 		},
 	}
@@ -196,6 +212,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(jsonData),
+				InstanceSelector: &metav1.LabelSelector{
+					MatchLabels: dashboardSelector.MatchLabels,
+				},
 			},
 		})
 	}
