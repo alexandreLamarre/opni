@@ -39,7 +39,6 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/grafana-operator/grafana-operator/v4 v4.10.1
 	github.com/grafana-operator/grafana-operator/v5 v5.4.1
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.2
