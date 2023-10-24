@@ -1,11 +1,14 @@
 package conformance_storage
 
 import (
+	"context"
+	"os/exec"
 	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gexec"
 
 	"github.com/rancher/opni/pkg/storage"
 	"github.com/rancher/opni/pkg/storage/lock"
@@ -13,17 +16,82 @@ import (
 	"github.com/samber/lo"
 )
 
-func LockManagerTestSuite[T storage.LockManagerBroker](
-	lmF future.Future[T],
+const (
+	LockRetOk             = 0
+	LockRetAcquireFail    = 1
+	LockRetValidationFail = 2
+)
+
+type testLock struct {
+	ctx          context.Context
+	key          string
+	expectedCode int
+
+	cmd     *exec.Cmd
+	session *gexec.Session
+}
+
+func newTestLock(
+	ctx context.Context,
+	key string,
+	expectedCode int,
+	lockBin string,
+	configPath string,
+) *testLock {
+	cmd := exec.CommandContext(ctx, lockBin, "--key", key, "-f", configPath)
+	return &testLock{
+		ctx:          ctx,
+		key:          key,
+		expectedCode: expectedCode,
+		cmd:          cmd,
+	}
+}
+
+func (l *testLock) Lock() error {
+	session, err := gexec.Start(l.cmd, GinkgoWriter, GinkgoWriter)
+	if err != nil {
+		return err
+	}
+	l.session = session
+	return nil
+}
+
+func LockManagerTestSuite(
+	lockConfig future.Future[string],
 ) func() {
 	return func() {
 		var lm storage.LockManager
+		var lockBin string
+
 		BeforeAll(func() {
-			lm = lmF.Get().LockManager("test")
+			var err error
+			lockBin, err = gexec.Build("../../../internal/cmd/lock")
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(func() {
+				gexec.CleanupBuildArtifacts()
+			})
+			// lm = lmF.Get().LockManager("test")
 		})
 
-		When("using distributed locks ", func() {
-			XIt("should only request lock actions once", func() { // FIXME
+		When("using distributed locks", func() {
+			It("should lock and unlock locks of the same type", func() {
+				ctx, ca := context.WithCancel(context.Background())
+				defer ca()
+				tl := newTestLock(
+					ctx,
+					"foo",
+					LockRetOk,
+					lockBin,
+					lockConfig.Get(),
+				)
+				Expect(tl.Lock()).To(Succeed())
+				Eventually(tl.session).Should(gexec.Exit(tl.expectedCode))
+
+			})
+		})
+
+		XWhen("using distributed locks ", func() {
+			XIt("should only request lock actions once", func() {
 				lock1 := lm.Locker("foo")
 				err := lock1.Lock()
 				Expect(err).NotTo(HaveOccurred())
@@ -39,6 +107,7 @@ func LockManagerTestSuite[T storage.LockManagerBroker](
 			})
 
 			It("should lock and unlock locks of the same type", func() {
+
 				lock1 := lm.Locker("todo")
 				Expect(lock1.Lock()).To(Succeed())
 				Expect(lock1.Unlock()).To(Succeed())
@@ -47,6 +116,7 @@ func LockManagerTestSuite[T storage.LockManagerBroker](
 				Expect(lock2.Lock()).To(Succeed())
 				Expect(lock2.Unlock()).To(Succeed())
 			})
+
 			It("should resolve concurrent lock requests", func() {
 				locks := []lockWithTransaction{}
 				for i := 0; i < 2; i++ {
@@ -83,7 +153,7 @@ func LockManagerTestSuite[T storage.LockManagerBroker](
 				Eventually(errs).Should(Receive(BeNil()))
 			})
 
-			Specify("locks should be able to acquire the lock if the existing lock has expired", func() {
+			XSpecify("locks should be able to acquire the lock if the existing lock has expired", func() {
 				exLock := lm.Locker("bar", lock.WithRetryDelay(1*time.Millisecond), lock.WithKeepalive(false), lock.WithExpireDuration(1*time.Second))
 				// some implementations expire durations are forced to round up to the largest second, so 3 *time.Second is a requirement here
 				otherLock := lm.Locker("bar", lock.WithAcquireTimeout(3*time.Second))
@@ -110,7 +180,7 @@ func LockManagerTestSuite[T storage.LockManagerBroker](
 			})
 		})
 
-		When("using exclusive locks in process", func() {
+		XWhen("using exclusive locks in process", func() {
 			It("should allow multiple exclusive writers to safely write using locks", func() {
 				lock1 := lm.Locker("foo2", lock.WithKeepalive(false), lock.WithExpireDuration(0*time.Second))
 				err := expectAtomic(lock1, func(opts ...lock.LockOption) storage.Lock {

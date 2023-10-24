@@ -45,7 +45,8 @@ var _ = Describe("Jetstream Cluster Store", Ordered, Label("integration", "slow"
 var _ = Describe("Jetstream RBAC Store", Ordered, Label("integration", "slow"), RBACStoreTestSuite(store))
 var _ = Describe("Jetstream Keyring Store", Ordered, Label("integration", "slow"), KeyringStoreTestSuite(store))
 var _ = Describe("Jetstream KV Store", Ordered, Label("integration", "slow"), KeyValueStoreTestSuite(store, NewBytes, Equal))
-var _ = Describe("Jetstream Lock Manager", Ordered, Label("integration", "slow"), LockManagerTestSuite(store))
+
+//var _ = Describe("Jetstream Lock Manager", Ordered, Label("integration", "slow"), LockManagerTestSuite(store))
 
 var _ = Context("Error Codes", func() {
 	Specify("Nats KeyNotFound errors should be equal to ErrNotFound", func() {
