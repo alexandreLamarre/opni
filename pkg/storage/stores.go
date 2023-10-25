@@ -188,10 +188,10 @@ type Lock interface {
 	// Lock acquires a lock on the key. If the lock is already held, it will block until the lock is released.\
 	//
 	// Lock returns an error when acquiring the lock fails.
-	Lock() error
+	Lock(ctx context.Context) error
 
 	// TryLock tries to acquire the lock on the key and reports whether it succeeded.
-	TryLock() (bool, error)
+	TryLock(ctx context.Context) (acquired bool, err error)
 
 	// Unlock releases the lock on the key. If the lock was never held, it will return an error.
 	Unlock() error

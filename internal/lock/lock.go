@@ -79,7 +79,7 @@ var (
 func BuildLockCommand() *cobra.Command {
 	var lockFile string
 	var lockKey string
-	var validFor time.Duration
+	var acquireTimeout time.Duration
 	var tryLock bool
 	cmd := &cobra.Command{
 		Use:          "lock",
@@ -87,16 +87,16 @@ func BuildLockCommand() *cobra.Command {
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run(cmd.Context(), LockConfig{
-				Key:        lockKey,
-				ValidFor:   validFor,
-				ConfigPath: lockFile,
-				Try:        tryLock,
+				Key:            lockKey,
+				AcquireTimeout: acquireTimeout,
+				ConfigPath:     lockFile,
+				Try:            tryLock,
 			})
 		},
 	}
 	cmd.Flags().StringVarP(&lockFile, "config", "f", "/tmp/lock.json", "lock file config")
 	cmd.Flags().StringVarP(&lockKey, "key", "k", "", "lock key")
-	cmd.Flags().DurationVarP(&validFor, "valid-for", "t", 0, "how long the lock is valid for (0 is infinite)")
+	cmd.Flags().DurationVarP(&acquireTimeout, "acquire-timeout", "t", 0, "timeout for acquiring lock (infinite if 0)")
 	cmd.Flags().BoolVarP(&tryLock, "try-lock", "q", false, "if lock is already held, do not wait for it to be released")
 	return cmd
 }
@@ -107,10 +107,10 @@ type LockBackendConfig struct {
 }
 
 type LockConfig struct {
-	Key        string
-	ValidFor   time.Duration
-	ConfigPath string
-	Try        bool
+	Key            string
+	AcquireTimeout time.Duration
+	ConfigPath     string
+	Try            bool
 }
 
 func (l *LockConfig) Validate() error {
@@ -136,7 +136,7 @@ func (l *LockBackendConfig) Validate() error {
 
 func run(ctx context.Context, lockcfg LockConfig) error {
 	lg := slog.Default()
-	lg.With("config", lockcfg.ConfigPath, "key", lockcfg.Key, "validity", lockcfg.ValidFor).Info("Starting lock")
+	lg.With("config", lockcfg.ConfigPath, "key", lockcfg.Key, "acquire-timeout", lockcfg.AcquireTimeout).Info("Starting lock")
 	if err := lockcfg.Validate(); err != nil {
 		lg.Error("failed to validate lock config")
 		return errors.Join(err, ErrLockValidationFailed)
@@ -204,22 +204,29 @@ func getConfig(configPath string) (*LockBackendConfig, error) {
 func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg *slog.Logger) error {
 	lg = lg.With("key", config.Key)
 	done := make(chan os.Signal, 1)
+	defer close(done)
 	ctxca, ca := context.WithCancel(ctx)
-	if config.ValidFor > 0 {
-		ctxca, ca = context.WithTimeout(ctx, config.ValidFor)
-	}
 	defer ca()
 	signal.Notify(done, os.Interrupt)
 	lg.Info("acquiring lock...")
 	go func() {
-		defer close(done)
 		<-done
 		ca()
 	}()
+	var (
+		acquireCtx    context.Context
+		acquireCancel context.CancelFunc
+	)
+	if config.AcquireTimeout > 0 {
+		acquireCtx, acquireCancel = context.WithTimeout(ctx, config.AcquireTimeout)
+	} else {
+		acquireCtx, acquireCancel = ctxca, ca
+	}
+	defer acquireCancel()
 
-	lock := lm.Locker(config.Key, lock.WithAcquireContext(ctx))
+	lock := lm.Locker(config.Key, lock.WithAcquireContext(acquireCtx))
 	if config.Try {
-		ack, err := lock.TryLock()
+		ack, err := lock.TryLock(ctxca)
 		if err != nil {
 			lg.With("err", err, "failed to acquire lock")
 			return errors.Join(err, ErrFailedToAcquireLock)
@@ -228,19 +235,37 @@ func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg 
 			return ErrLockAcquired
 		}
 	} else {
-		if err := lock.Lock(); err != nil {
+		if err := lock.Lock(ctxca); err != nil {
 			lg.With("err", err, "failed to acquire lock")
 			return errors.Join(err, ErrFailedToAcquireLock)
 		}
 	}
 	lg.Info("acquired lock")
 	defer func() {
+		lg.Info("releasing lock...")
 		if err := lock.Unlock(); err != nil {
 			lg.With("err", err, "failed to release lock")
+		} else {
+			lg.Info("lock released")
 		}
 	}()
+	t := time.NewTicker(time.Second)
+	defer t.Stop()
+	exit := false
+	for {
+		select {
+		case <-ctxca.Done():
+			lg.Info("lock context done")
+			exit = true
+		case <-t.C:
+			lg.Info("lock is held")
+		}
+		if exit {
+			break
+		}
+	}
 
 	<-ctxca.Done()
-	lg.Info("releasing lock...")
+	lg.Info("lock context cancelled")
 	return nil
 }
