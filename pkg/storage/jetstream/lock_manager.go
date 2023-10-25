@@ -25,8 +25,9 @@ func NewJetstreamLockManager(ctx context.Context, conf *v1beta1.JetStreamStorage
 		BucketPrefix: "gateway",
 	}
 	options.apply(opts...)
-
-	lg := logger.New(logger.WithLogLevel(slog.LevelWarn)).WithGroup("jetstream")
+	//FIXME: this panics
+	// lg := logger.New(logger.WithLogLevel(slog.LevelWarn)).WithGroup("jetstream")
+	lg := slog.Default()
 
 	nkeyOpt, err := nats.NkeyOptionFromSeed(conf.NkeySeedPath)
 	if err != nil {

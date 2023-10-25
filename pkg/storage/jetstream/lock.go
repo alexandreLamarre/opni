@@ -1,6 +1,7 @@
 package jetstream
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -27,6 +28,9 @@ type Lock struct {
 
 	acquired uint32
 
+	retryDelay   time.Duration
+	lockValidity time.Duration
+
 	js   nats.JetStreamContext
 	sub  *nats.Subscription
 	msgQ chan *nats.Msg
@@ -40,15 +44,17 @@ var _ storage.Lock = (*Lock)(nil)
 
 func NewLock(js nats.JetStreamContext, key string, options *lock.LockOptions) *Lock {
 	return &Lock{
-		key:         key,
-		js:          js,
-		uuid:        uuid.New().String(),
-		msgQ:        make(chan *nats.Msg, 16),
-		LockOptions: options,
+		key:          key,
+		js:           js,
+		uuid:         uuid.New().String(),
+		msgQ:         make(chan *nats.Msg, 16),
+		LockOptions:  options,
+		retryDelay:   time.Millisecond * 50,
+		lockValidity: time.Second * 60,
 	}
 }
 
-func (l *Lock) Lock() error {
+func (l *Lock) Lock(_ context.Context) error {
 
 	return l.startLock.Do(func() error {
 		return l.lock()
@@ -56,8 +62,8 @@ func (l *Lock) Lock() error {
 }
 
 func (l *Lock) lock() error {
-	timeout := time.After(l.AcquireTimeout)
-	tTicker := time.NewTicker(l.RetryDelay)
+	// timeout := time.After(l.AcquireTimeout)
+	tTicker := time.NewTicker(l.retryDelay)
 	defer tTicker.Stop()
 
 	var lockErr error
@@ -70,9 +76,9 @@ func (l *Lock) lock() error {
 			}
 			lockErr = err
 		case <-l.AcquireContext.Done():
-			return errors.Join(lock.ErrAcquireLockCancelled, lockErr)
-		case <-timeout:
-			return errors.Join(lockErr, lock.ErrAcquireLockTimeout)
+			return errors.Join(l.AcquireContext.Err(), lockErr)
+			// case <-timeout:
+			// return errors.Join(lockErr, lock.ErrAcquireLockTimeout)
 		}
 	}
 }
@@ -85,13 +91,13 @@ func (l *Lock) tryLock() error {
 	cfg := &nats.ConsumerConfig{
 		Durable:           l.uuid,
 		AckPolicy:         nats.AckExplicitPolicy,
-		InactiveThreshold: l.LockValidity,
+		InactiveThreshold: l.lockValidity,
 		DeliverSubject:    l.uuid,
 	}
-	if l.Keepalive {
-		// Push-based details, defaults to 5 * time.Second
-		cfg.Heartbeat = max(l.RetryDelay, 100*time.Millisecond)
-	}
+	// if l.Keepalive {
+	// Push-based details, defaults to 5 * time.Second
+	cfg.Heartbeat = max(l.retryDelay, 100*time.Millisecond)
+	// }
 
 	if _, err := l.js.AddConsumer(l.key, cfg); err != nil {
 		return err
@@ -101,41 +107,55 @@ func (l *Lock) tryLock() error {
 		return err
 	}
 	go l.keepalive()
-	go l.expire()
+	// go l.expire()
 	atomic.StoreUint32(&l.acquired, 1)
 	return nil
 }
 
-func (l *Lock) expire() {
-	if l.Keepalive {
-		return
-	}
-	timeout := time.After(l.LockValidity)
-	<-timeout
-	l.unlock()
-}
+// func (l *Lock) expire() {
+// 	if l.Keepalive {
+// 		return
+// 	}
+// 	timeout := time.After(l.lockValidity)
+// 	<-timeout
+// 	l.unlock()
+// 	fmt.Println("expiring lock")
+// }
 
 func (l *Lock) keepalive() {
-	if !l.Keepalive {
-		return
-	}
-	for msg := range l.msgQ {
-		msg.Ack()
+	// fmt.Println("keepalive", l.Keepalive)
+	defer func() {
+		fmt.Println("releasing keepalive loop")
+	}()
+	// if !l.Keepalive {
+	// 	return
+	// }
+	for {
+		select {
+		case msg, ok := <-l.msgQ:
+			if !ok {
+				return
+			} else {
+				if err := msg.Ack(); err != nil {
+					fmt.Println("failed to ack msg", err.Error())
+				}
+			}
+		}
 	}
 }
 
 func (l *Lock) Unlock() error {
 	return l.startUnlock.Do(func() error {
 		if atomic.LoadUint32(&l.acquired) == 0 {
-			return lock.ErrLockNotAcquired
+			return fmt.Errorf("lock never acquired")
 		}
 		return l.unlock()
 	})
 }
 
 func (l *Lock) unlock() error {
-	timeout := time.After(l.AcquireTimeout)
-	tTicker := time.NewTicker(l.RetryDelay)
+	// timeout := time.After(l.AcquireTimeout)
+	tTicker := time.NewTicker(l.retryDelay)
 	defer tTicker.Stop()
 
 	var unlockErr error
@@ -148,9 +168,10 @@ func (l *Lock) unlock() error {
 			}
 			unlockErr = err
 		case <-l.AcquireContext.Done():
-			return errors.Join(lock.ErrAcquireUnlockCancelled, unlockErr)
-		case <-timeout:
-			return errors.Join(lock.ErrAcquireUnlockTimeout, unlockErr)
+			return errors.Join(l.AcquireContext.Err(), unlockErr)
+			// return errors.Join(lock.ErrAcquireUnlockCancelled, unlockErr)
+			// case <-timeout:
+			// 	return errors.Join(lock.ErrAcquireUnlockTimeout, unlockErr)
 		}
 	}
 }
@@ -175,14 +196,14 @@ func (l *Lock) Key() string {
 	return l.key
 }
 
-func (l *Lock) TryLock() (bool, error) {
+func (l *Lock) TryLock(_ context.Context) (acquired bool, err error) {
 	// TODO
-	err := l.tryLock()
-	return err == nil, err
+	err = l.tryLock()
+	return err != nil, err
 }
 
 func (l *Lock) TryUnlock() (bool, error) {
 	// TODO
 	err := l.tryUnlock()
-	return err == nil, err
+	return err != nil, err
 }
