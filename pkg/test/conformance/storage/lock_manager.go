@@ -85,12 +85,14 @@ func LockManagerTestSuite(
 					lockConfig.Get(),
 				)
 				Expect(tl.Lock()).To(Succeed())
+				go func() {
+					<-time.After(time.Millisecond * 50)
+				}()
 				Eventually(tl.session).Should(gexec.Exit(tl.expectedCode))
-
 			})
 		})
 
-		XWhen("using distributed locks ", func() {
+		When("using distributed locks ", func() {
 			XIt("should only request lock actions once", func() {
 				lock1 := lm.Locker("foo")
 				err := lock1.Lock()
@@ -154,9 +156,9 @@ func LockManagerTestSuite(
 			})
 
 			XSpecify("locks should be able to acquire the lock if the existing lock has expired", func() {
-				exLock := lm.Locker("bar", lock.WithRetryDelay(1*time.Millisecond), lock.WithKeepalive(false), lock.WithExpireDuration(1*time.Second))
+				exLock := lm.Locker("bar")
 				// some implementations expire durations are forced to round up to the largest second, so 3 *time.Second is a requirement here
-				otherLock := lm.Locker("bar", lock.WithAcquireTimeout(3*time.Second))
+				otherLock := lm.Locker("bar")
 				err := exLock.Lock()
 				Expect(err).NotTo(HaveOccurred())
 
@@ -182,7 +184,7 @@ func LockManagerTestSuite(
 
 		XWhen("using exclusive locks in process", func() {
 			It("should allow multiple exclusive writers to safely write using locks", func() {
-				lock1 := lm.Locker("foo2", lock.WithKeepalive(false), lock.WithExpireDuration(0*time.Second))
+				lock1 := lm.Locker("foo2")
 				err := expectAtomic(lock1, func(opts ...lock.LockOption) storage.Lock {
 					return lm.Locker("foo2", opts...)
 				})
@@ -190,7 +192,7 @@ func LockManagerTestSuite(
 			})
 
 			It("should block other locks from acquiring the lock if the process holding the lock is alive", func() {
-				lock1 := lm.Locker("foo3", lock.WithKeepalive(true), lock.WithExpireDuration(0*time.Second))
+				lock1 := lm.Locker("foo3")
 				err := expectAtomicKeepAlive(lock1, func(opts ...lock.LockOption) storage.Lock {
 					return lm.Locker("foo3", opts...)
 				})

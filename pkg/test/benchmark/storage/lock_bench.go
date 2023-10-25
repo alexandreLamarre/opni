@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gmeasure"
 	"github.com/rancher/opni/pkg/storage"
-	"github.com/rancher/opni/pkg/storage/lock"
 	"github.com/rancher/opni/pkg/test/testruntime"
 	"github.com/rancher/opni/pkg/util/future"
 	"golang.org/x/sync/errgroup"
@@ -50,7 +49,7 @@ func LockManagerBenchmark[T storage.LockManagerBroker](
 					for _, n := range tcs {
 						lockers := make([]storage.Lock, n)
 						for i := 0; i < n; i++ {
-							lockers[i] = lm.Locker("test", lock.WithAcquireTimeout(lock.DefaultTimeout), lock.WithRetryDelay(1*time.Microsecond))
+							lockers[i] = lm.Locker("test")
 						}
 						expirementName := fmt.Sprintf("exclusive transactions %d", n)
 						expirement.MeasureDuration(expirementName, func() {
@@ -104,7 +103,7 @@ func LockManagerBenchmark[T storage.LockManagerBroker](
 
 						for i := 0; i < tc.N; i++ {
 							for j := 0; j < tc.n; j++ {
-								lockers[i*tc.n+j] = lms[i].Locker("test", lock.WithAcquireTimeout(lock.DefaultTimeout), lock.WithRetryDelay(1*time.Microsecond))
+								lockers[i*tc.n+j] = lms[i].Locker("test")
 							}
 						}
 						expirement.MeasureDuration(fmt.Sprintf("distributed exclusive transactions %dX%d", tc.N, tc.n), func() {
