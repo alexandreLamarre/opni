@@ -141,7 +141,6 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "opni-gateway.json",
 				Namespace: r.mc.Namespace,
-				Labels:    dashboardSelector.MatchLabels,
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(opniGatewayJson),
@@ -154,7 +153,6 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "opni-home.json",
 				Namespace: r.mc.Namespace,
-				Labels:    dashboardSelector.MatchLabels,
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(homeDashboardJson),
@@ -168,7 +166,6 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "opni-service-latency.json",
 				Namespace: r.mc.Namespace,
-				Labels:    dashboardSelector.MatchLabels,
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(serviceLatencyDashboardJson),
@@ -181,7 +178,6 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "slo-overview.json",
 				Namespace: r.mc.Namespace,
-				Labels:    dashboardSelector.MatchLabels,
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(sloOverviewDashboard),
@@ -194,7 +190,6 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "slo-detailed.json",
 				Namespace: r.mc.Namespace,
-				Labels:    dashboardSelector.MatchLabels,
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(sloDetailedDashboard),
@@ -214,7 +209,6 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: r.mc.Namespace,
-				Labels:    dashboardSelector.MatchLabels,
 			},
 			Spec: grafanav1beta1.GrafanaDashboardSpec{
 				Json: string(jsonData),
