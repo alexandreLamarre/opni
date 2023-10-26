@@ -92,6 +92,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			Namespace: r.mc.Namespace,
 		},
 		Spec: grafanav1beta1.GrafanaDatasourceSpec{
+			InstanceSelector: &metav1.LabelSelector{
+				MatchLabels: dashboardSelector.MatchLabels,
+			},
 			Datasource: &grafanav1beta1.GrafanaDatasourceInternal{
 				Name:   "Opni",
 				Type:   "prometheus",
@@ -117,6 +120,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			Namespace: r.mc.Namespace,
 		},
 		Spec: grafanav1beta1.GrafanaDatasourceSpec{
+			InstanceSelector: &metav1.LabelSelector{
+				MatchLabels: dashboardSelector.MatchLabels,
+			},
 			Datasource: &grafanav1beta1.GrafanaDatasourceInternal{
 				Name:   "Opni Alertmanager",
 				Type:   "opni_alertmanager",
