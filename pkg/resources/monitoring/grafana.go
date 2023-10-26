@@ -264,6 +264,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 					Spec: &grafanav1beta1.DeploymentV1PodSpec{
 						Containers: []corev1.Container{
 							{
+								Name:  "grafana",
 								Image: grafanaImageRepo + "/grafana:" + tag,
 								Env: []corev1.EnvVar{
 									{
