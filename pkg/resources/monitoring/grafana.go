@@ -271,39 +271,39 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		return nil, fmt.Errorf("invalid grafana hostname: %w", err)
 	}
 
-	//tag := grafanaImageVersion
-	//if r.mc.Spec.Grafana.GetVersion() != "" {
-	//	tag = strings.TrimSpace(r.mc.Spec.Grafana.GetVersion())
-	//}
+	tag := grafanaImageVersion
+	if r.mc.Spec.Grafana.GetVersion() != "" {
+		tag = strings.TrimSpace(r.mc.Spec.Grafana.GetVersion())
+	}
 
 	defaults := grafanav1beta1.GrafanaSpec{
 		Client: &grafanav1beta1.GrafanaClient{
 			PreferIngress: lo.ToPtr(false),
 		},
 		Config: createDefaultGrafanaIni(grafanaHostname),
-		//Deployment: &grafanav1beta1.DeploymentV1{
-		//	Spec: grafanav1beta1.DeploymentV1Spec{
-		//		Template: &grafanav1beta1.DeploymentV1PodTemplateSpec{
-		//			Spec: &grafanav1beta1.DeploymentV1PodSpec{
-		//				Containers: []corev1.Container{
-		//					{
-		//						Name:  "grafana",
-		//						Image: grafanaImageRepo + "/grafana:" + tag,
-		//						Env: []corev1.EnvVar{
-		//							{
-		//								Name:  "GF_INSTALL_PLUGINS",
-		//								Value: "grafana-polystat-panel,marcusolsson-treemap-panel",
-		//							},
-		//						},
-		//					},
-		//				},
-		//				SecurityContext: &corev1.PodSecurityContext{
-		//					FSGroup: lo.ToPtr(int64(472)),
-		//				},
-		//			},
-		//		},
-		//	},
-		//},
+		Deployment: &grafanav1beta1.DeploymentV1{
+			Spec: grafanav1beta1.DeploymentV1Spec{
+				Template: &grafanav1beta1.DeploymentV1PodTemplateSpec{
+					Spec: &grafanav1beta1.DeploymentV1PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "grafana",
+								Image: grafanaImageRepo + "/grafana:" + tag,
+								Env: []corev1.EnvVar{
+									{
+										Name:  "GF_INSTALL_PLUGINS",
+										Value: "grafana-polystat-panel,marcusolsson-treemap-panel",
+									},
+								},
+							},
+						},
+						SecurityContext: &corev1.PodSecurityContext{
+							FSGroup: lo.ToPtr(int64(472)),
+						},
+					},
+				},
+			},
+		},
 		// Secrets: []string{"opni-gateway-client-cert"},
 		PersistentVolumeClaim: &grafanav1beta1.PersistentVolumeClaimV1{
 			Spec: &grafanav1beta1.PersistentVolumeClaimV1Spec{
