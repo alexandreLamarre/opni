@@ -147,7 +147,8 @@ func run(ctx context.Context, lockcfg LockConfig) error {
 		return errors.Join(err, ErrLockSetupFailure)
 	}
 
-	lm, err := getLockManager(ctx, config)
+	// intentional : use background context so that clients do not trivially close their connections as soon cmd.Context() is signaled as done
+	lm, err := getLockManager(context.Background(), config)
 	if err != nil {
 		configB, _ := json.Marshal(config)
 		lg.With("config", string(configB)).Error(err.Error())
@@ -228,7 +229,7 @@ func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg 
 	if config.Try {
 		ack, err := lock.TryLock(ctxca)
 		if err != nil {
-			lg.With("err", err, "failed to acquire lock")
+			lg.With("err", err).Error("failed to acquire lock")
 			return errors.Join(err, ErrFailedToAcquireLock)
 		}
 		if !ack {
@@ -236,7 +237,7 @@ func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg 
 		}
 	} else {
 		if err := lock.Lock(ctxca); err != nil {
-			lg.With("err", err, "failed to acquire lock")
+			lg.With("err", err).Error("failed to acquire lock")
 			return errors.Join(err, ErrFailedToAcquireLock)
 		}
 	}
@@ -244,7 +245,7 @@ func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg 
 	defer func() {
 		lg.Info("releasing lock...")
 		if err := lock.Unlock(); err != nil {
-			lg.With("err", err, "failed to release lock")
+			lg.With("err", err).Error("failed to release lock")
 		} else {
 			lg.Info("lock released")
 		}
