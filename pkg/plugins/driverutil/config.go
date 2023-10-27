@@ -2,9 +2,11 @@ package driverutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/bufbuild/protovalidate-go"
 	corev1 "github.com/rancher/opni/pkg/apis/core/v1"
 	"github.com/rancher/opni/pkg/storage"
 	"github.com/rancher/opni/pkg/util"
@@ -18,8 +20,9 @@ import (
 type DefaultLoaderFunc[T any] func(T)
 
 type DryRunResults[T any] struct {
-	Current  T
-	Modified T
+	Current          T
+	Modified         T
+	ValidationErrors *protovalidate.ValidationError
 }
 
 type DefaultingConfigTracker[T ConfigType[T]] struct {
@@ -31,6 +34,8 @@ type DefaultingConfigTracker[T ConfigType[T]] struct {
 
 	redact   func(SecretsRedactor[T])
 	unredact func(SecretsRedactor[T], T) error
+
+	validator *protovalidate.Validator
 }
 
 func NewDefaultingConfigTracker[T ConfigType[T]](
@@ -45,6 +50,7 @@ func NewDefaultingConfigTracker[T ConfigType[T]](
 		revisionFieldIndex: GetRevisionFieldIndex[T](),
 		redact:             (SecretsRedactor[T]).RedactSecrets,
 		unredact:           (SecretsRedactor[T]).UnredactSecrets,
+		validator:          util.Must(protovalidate.New(protovalidate.WithMessages(util.NewMessage[T]()))),
 	}
 }
 
@@ -266,56 +272,28 @@ func (ct *DefaultingConfigTracker[T]) ApplyConfig(ctx context.Context, newConfig
 	return ct.activeStore.Put(ctx, existing, storage.WithRevision(rev))
 }
 
-func (ct *DefaultingConfigTracker[T]) DryRun(ctx context.Context, req DryRunRequestType[T]) (*DryRunResults[T], error) {
+func (ct *DefaultingConfigTracker[T]) DryRun(ctx context.Context, req DryRunRequestType[T]) (DryRunResults[T], error) {
 	switch req.GetTarget() {
 	case Target_ActiveConfiguration:
 		switch req.GetAction() {
 		case Action_Set:
-			res, err := ct.DryRunApplyConfig(ctx, req.GetSpec())
-			if err != nil {
-				return nil, err
-			}
-			return &DryRunResults[T]{
-				Current:  res.Current,
-				Modified: res.Modified,
-			}, nil
+			return ct.DryRunApplyConfig(ctx, req.GetSpec())
 		case Action_Reset:
-			res, err := ct.DryRunResetConfig(ctx, req.GetMask(), req.GetPatch(), req.GetRevision())
-			if err != nil {
-				return nil, err
-			}
-			return &DryRunResults[T]{
-				Current:  res.Current,
-				Modified: res.Modified,
-			}, nil
+			return ct.DryRunResetConfig(ctx, req.GetMask(), req.GetPatch(), req.GetRevision())
 		default:
-			return nil, fmt.Errorf("invalid action: %s", req.GetAction())
+			return DryRunResults[T]{}, fmt.Errorf("invalid action: %s", req.GetAction())
 		}
 	case Target_DefaultConfiguration:
 		switch req.GetAction() {
 		case Action_Set:
-			res, err := ct.DryRunSetDefaultConfig(ctx, req.GetSpec())
-			if err != nil {
-				return nil, err
-			}
-			return &DryRunResults[T]{
-				Current:  res.Current,
-				Modified: res.Modified,
-			}, nil
+			return ct.DryRunSetDefaultConfig(ctx, req.GetSpec())
 		case Action_Reset:
-			res, err := ct.DryRunResetDefaultConfig(ctx, req.GetRevision())
-			if err != nil {
-				return nil, err
-			}
-			return &DryRunResults[T]{
-				Current:  res.Current,
-				Modified: res.Modified,
-			}, nil
+			return ct.DryRunResetDefaultConfig(ctx, req.GetRevision())
 		default:
-			return nil, fmt.Errorf("invalid action: %s", req.GetAction())
+			return DryRunResults[T]{}, fmt.Errorf("invalid action: %s", req.GetAction())
 		}
 	default:
-		return nil, fmt.Errorf("invalid target: %s", req.GetTarget())
+		return DryRunResults[T]{}, fmt.Errorf("invalid target: %s", req.GetTarget())
 	}
 }
 
@@ -337,6 +315,18 @@ func (ct *DefaultingConfigTracker[T]) History(ctx context.Context, target Target
 		rev.Value().RedactSecrets()
 	}
 	return revisions, nil
+}
+
+func (ct *DefaultingConfigTracker[T]) runValidation(conf T) (*protovalidate.ValidationError, error) {
+	err := ct.validator.Validate(conf)
+	var valErr *protovalidate.ValidationError
+	if err != nil {
+		if !errors.As(err, &valErr) {
+			// invalid validation rules, etc.
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	return valErr, nil
 }
 
 func (ct *DefaultingConfigTracker[T]) DryRunApplyConfig(ctx context.Context, newConfig T) (DryRunResults[T], error) {
@@ -366,9 +356,15 @@ func (ct *DefaultingConfigTracker[T]) DryRunApplyConfig(ctx context.Context, new
 	// in the actual object inside the kv store, so they should not be included
 	// in the diff.
 	UnsetRevision(modified)
+
+	valErr, err := ct.runValidation(modified)
+	if err != nil {
+		return DryRunResults[T]{}, err
+	}
 	return DryRunResults[T]{
-		Current:  current,
-		Modified: modified,
+		Current:          current,
+		Modified:         modified,
+		ValidationErrors: valErr,
 	}, nil
 }
 
@@ -390,9 +386,14 @@ func (ct *DefaultingConfigTracker[T]) DryRunSetDefaultConfig(ctx context.Context
 	ct.redact(current)
 	ct.redact(newDefault)
 
+	valErr, err := ct.runValidation(newDefault)
+	if err != nil {
+		return DryRunResults[T]{}, err
+	}
 	return DryRunResults[T]{
-		Current:  current,
-		Modified: newDefault,
+		Current:          current,
+		Modified:         newDefault,
+		ValidationErrors: valErr,
 	}, nil
 }
 
@@ -411,9 +412,15 @@ func (ct *DefaultingConfigTracker[T]) DryRunResetDefaultConfig(ctx context.Conte
 
 	ct.redact(current)
 	ct.redact(newDefault)
+
+	valErr, err := ct.runValidation(newDefault)
+	if err != nil {
+		return DryRunResults[T]{}, err
+	}
 	return DryRunResults[T]{
-		Current:  current,
-		Modified: newDefault,
+		Current:          current,
+		Modified:         newDefault,
+		ValidationErrors: valErr,
 	}, nil
 }
 
@@ -431,9 +438,15 @@ func (ct *DefaultingConfigTracker[T]) DryRunResetConfig(ctx context.Context, mas
 	if mask == nil {
 		ct.redact(activeConfig)
 		ct.redact(defaultConfig)
+
+		valErr, err := ct.runValidation(defaultConfig)
+		if err != nil {
+			return DryRunResults[T]{}, err
+		}
 		return DryRunResults[T]{
-			Current:  activeConfig,
-			Modified: defaultConfig,
+			Current:          activeConfig,
+			Modified:         defaultConfig,
+			ValidationErrors: valErr,
 		}, nil
 	}
 
@@ -460,9 +473,15 @@ func (ct *DefaultingConfigTracker[T]) DryRunResetConfig(ctx context.Context, mas
 
 	ct.redact(originalCurrent)
 	ct.redact(defaultConfig)
+
+	valErr, err := ct.runValidation(defaultConfig)
+	if err != nil {
+		return DryRunResults[T]{}, err
+	}
 	return DryRunResults[T]{
-		Current:  originalCurrent,
-		Modified: defaultConfig,
+		Current:          originalCurrent,
+		Modified:         defaultConfig,
+		ValidationErrors: valErr,
 	}, nil
 }
 

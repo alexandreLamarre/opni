@@ -4,6 +4,7 @@
 package ext
 
 import (
+	validate "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	context "context"
 	errors "errors"
 	cli "github.com/rancher/opni/internal/codegen/cli"
@@ -608,6 +609,10 @@ func (in *SampleDryRunResponse) FlagSet(prefix ...string) *pflag.FlagSet {
 		in.Modified = &SampleConfiguration{}
 	}
 	fs.AddFlagSet(in.Modified.FlagSet(append(prefix, "modified")...))
+	if in.ValidationErrors == nil {
+		in.ValidationErrors = &validate.Violations{}
+	}
+	fs.AddFlagSet(in.ValidationErrors.FlagSet(append(prefix, "validation-errors")...))
 	return fs
 }
 

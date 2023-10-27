@@ -3,6 +3,7 @@ package driverutil
 import (
 	"context"
 
+	"buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	corev1 "github.com/rancher/opni/pkg/apis/core/v1"
 	flagutil "github.com/rancher/opni/pkg/util/flagutil"
 	"google.golang.org/grpc"
@@ -94,7 +95,7 @@ type DryRunResponseType[T ConfigType[T]] interface {
 	proto.Message
 	GetCurrent() T
 	GetModified() T
-	GetValidationErrors() []*ValidationError
+	GetValidationErrors() *validate.Violations
 }
 
 type HistoryResponseType[T ConfigType[T]] interface {
