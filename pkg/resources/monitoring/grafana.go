@@ -106,6 +106,14 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				JSONData:       opniDatasourceJSONCfg,
 				SecureJSONData: opniDatasourceSecureJSONCfg,
 			},
+			Plugins: []grafanav1beta1.GrafanaPlugin{
+				{
+					Name: "grafana-polystat-panel",
+				},
+				{
+					Name: "marcusolsson-treemap-panel",
+				},
+			},
 		},
 	}
 
@@ -132,6 +140,14 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				Editable:       lo.ToPtr(false),
 				JSONData:       opniAlertManagerDatasourceJSONCfg,
 				SecureJSONData: opniDatasourceSecureJSONCfg,
+			},
+			Plugins: []grafanav1beta1.GrafanaPlugin{
+				{
+					Name: "grafana-polystat-panel",
+				},
+				{
+					Name: "marcusolsson-treemap-panel",
+				},
 			},
 		},
 	}
