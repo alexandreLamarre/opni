@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,8 +27,6 @@ type Lock struct {
 	key  string
 	uuid string
 
-	acquired uint32
-
 	retryDelay   time.Duration
 	lockValidity time.Duration
 
@@ -36,8 +35,8 @@ type Lock struct {
 	msgQ chan *nats.Msg
 	*lock.LockOptions
 
-	startLock   lock.LockPrimitive
-	startUnlock lock.LockPrimitive
+	signalUnlock chan struct{}
+	lg           *slog.Logger
 }
 
 var _ storage.Lock = (*Lock)(nil)
@@ -49,20 +48,18 @@ func NewLock(js nats.JetStreamContext, key string, options *lock.LockOptions) *L
 		uuid:         uuid.New().String(),
 		msgQ:         make(chan *nats.Msg, 16),
 		LockOptions:  options,
-		retryDelay:   time.Millisecond * 50,
+		retryDelay:   time.Second,
 		lockValidity: time.Second * 60,
+		lg:           slog.Default(),
+		signalUnlock: make(chan struct{}),
 	}
 }
 
-func (l *Lock) Lock(_ context.Context) error {
-
-	return l.startLock.Do(func() error {
-		return l.lock()
-	})
+func (l *Lock) Lock(ctx context.Context) error {
+	return l.lock(ctx)
 }
 
-func (l *Lock) lock() error {
-	// timeout := time.After(l.AcquireTimeout)
+func (l *Lock) lock(ctx context.Context) error {
 	tTicker := time.NewTicker(l.retryDelay)
 	defer tTicker.Stop()
 
@@ -75,15 +72,14 @@ func (l *Lock) lock() error {
 				return nil
 			}
 			lockErr = err
-		case <-l.AcquireContext.Done():
+		case <-ctx.Done():
 			return errors.Join(l.AcquireContext.Err(), lockErr)
-			// case <-timeout:
-			// return errors.Join(lockErr, lock.ErrAcquireLockTimeout)
 		}
 	}
 }
 
 func (l *Lock) tryLock() error {
+	l.lg.With("key", l.key).Debug("trying to acquire lock")
 	var err error
 	if _, err := l.js.AddStream(newLease(l.key)); err != nil {
 		return err
@@ -94,71 +90,60 @@ func (l *Lock) tryLock() error {
 		InactiveThreshold: l.lockValidity,
 		DeliverSubject:    l.uuid,
 	}
-	// if l.Keepalive {
-	// Push-based details, defaults to 5 * time.Second
 	cfg.Heartbeat = max(l.retryDelay, 100*time.Millisecond)
-	// }
 
 	if _, err := l.js.AddConsumer(l.key, cfg); err != nil {
+		l.lg.Error(fmt.Sprintf("failed to add consumer : %s", err.Error()))
 		return err
 	}
 	l.sub, err = l.js.ChanSubscribe(l.uuid, l.msgQ, nats.Bind(l.key, l.uuid))
 	if err != nil {
+		l.lg.Error(fmt.Sprintf("failed to subscribe : %s", err.Error()))
 		return err
 	}
 	go l.keepalive()
-	// go l.expire()
-	atomic.StoreUint32(&l.acquired, 1)
 	return nil
 }
 
-// func (l *Lock) expire() {
-// 	if l.Keepalive {
-// 		return
-// 	}
-// 	timeout := time.After(l.lockValidity)
-// 	<-timeout
-// 	l.unlock()
-// 	fmt.Println("expiring lock")
-// }
-
 func (l *Lock) keepalive() {
-	// fmt.Println("keepalive", l.Keepalive)
-	defer func() {
-		fmt.Println("releasing keepalive loop")
-	}()
-	// if !l.Keepalive {
-	// 	return
-	// }
 	for {
 		select {
 		case msg, ok := <-l.msgQ:
 			if !ok {
+				l.lg.Warn("releasing keepalive loop")
 				return
 			} else {
 				if err := msg.Ack(); err != nil {
-					fmt.Println("failed to ack msg", err.Error())
+					l.lg.Error(fmt.Sprintf("failed to ack : %s", err.Error()))
 				}
 			}
+		case <-l.signalUnlock:
+			return
 		}
+
 	}
 }
 
 func (l *Lock) Unlock() error {
-	return l.startUnlock.Do(func() error {
-		if atomic.LoadUint32(&l.acquired) == 0 {
-			return fmt.Errorf("lock never acquired")
-		}
-		return l.unlock()
-	})
+	ctx, ca := context.WithTimeout(context.Background(), 60*time.Second)
+	defer ca()
+	return l.unlock(ctx)
 }
 
-func (l *Lock) unlock() error {
+// best effort unlock until context is done, at which point we
+// basically disconnect the connection keepalive semantic
+// which delegates unlock the key to the KV server-side,
+// giving the guarantee that unlock always actually unlocks when called
+func (l *Lock) unlock(ctx context.Context) error {
 	// timeout := time.After(l.AcquireTimeout)
 	tTicker := time.NewTicker(l.retryDelay)
 	defer tTicker.Stop()
+	defer func() {
+		l.lg.Info("released lock")
+		l.signalUnlock <- struct{}{}
+		close(l.signalUnlock)
+	}()
 
-	var unlockErr error
 	for {
 		select {
 		case <-tTicker.C:
@@ -166,27 +151,25 @@ func (l *Lock) unlock() error {
 			if err == nil {
 				return nil
 			}
-			unlockErr = err
-		case <-l.AcquireContext.Done():
-			return errors.Join(l.AcquireContext.Err(), unlockErr)
-			// return errors.Join(lock.ErrAcquireUnlockCancelled, unlockErr)
-			// case <-timeout:
-			// 	return errors.Join(lock.ErrAcquireUnlockTimeout, unlockErr)
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 }
 
+func (l *Lock) isReleased(err error) bool {
+	return errors.Is(err, nats.ErrConsumerNotFound) || errors.Is(err, nats.ErrConsumerNotActive)
+}
+
+// FYI : do not treats nats closed connections as successful unlocks, this could lead to inconsistent states
 func (l *Lock) tryUnlock() error {
-	if err := l.sub.Unsubscribe(); err != nil {
-		if errors.Is(err, nats.ErrBadSubscription) || errors.Is(err, nats.ErrConsumerNotActive) { // lock already released
-			return nil
-		}
-		return err
+	consumerErr := l.js.DeleteConsumer(l.key, l.uuid)
+	if !l.isReleased(consumerErr) {
+		l.lg.Error(fmt.Sprintf("failed to delete consumer : %s", consumerErr.Error()))
+		return consumerErr
 	}
-	if err := l.js.DeleteConsumer(l.key, l.uuid); err != nil {
-		if errors.Is(err, nats.ErrConsumerNotFound) || errors.Is(err, nats.ErrConsumerNotActive) { // lock already released
-			return nil
-		}
+	if err := l.sub.Unsubscribe(); err != nil {
+		l.lg.Error(fmt.Sprintf("failed to unsubscribe : %s", err.Error()))
 		return err
 	}
 	return nil
@@ -197,13 +180,16 @@ func (l *Lock) Key() string {
 }
 
 func (l *Lock) TryLock(_ context.Context) (acquired bool, err error) {
-	// TODO
 	err = l.tryLock()
-	return err != nil, err
-}
+	if err == nil {
+		return true, nil
+	}
 
-func (l *Lock) TryUnlock() (bool, error) {
-	// TODO
-	err := l.tryUnlock()
-	return err != nil, err
+	// hack : jetstream client does not have an error type for : maxium consumers limit reached
+	if strings.Contains(err.Error(), "maximum consumers limit reached") {
+		// the request has gone through but someone else has the lock
+		return false, nil
+	}
+
+	return false, err
 }

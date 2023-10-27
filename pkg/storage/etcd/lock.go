@@ -1,5 +1,7 @@
 package etcd
 
+// TODO : there are still some edge cases to address that are improperly handled, with the way clients are setup and when etcd is unreachable
+
 import (
 	"context"
 	"errors"
@@ -9,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/rancher/opni/pkg/storage"
 	"github.com/rancher/opni/pkg/storage/etcd/concurrencyx"
@@ -93,9 +96,7 @@ type EtcdLock struct {
 	// only accessed atomically
 	setup *uint32
 
-	startLock   lock.LockPrimitive
-	startUnlock lock.LockPrimitive
-	options     *lock.LockOptions
+	options *lock.LockOptions
 }
 
 func (e *EtcdLock) Session() (*concurrency.Session, error) {
@@ -129,6 +130,7 @@ func (e *EtcdLock) renewSession() error {
 var _ storage.Lock = (*EtcdLock)(nil)
 
 // TODO : this doesn't handle setting up repeated mutexes, which the original implementation forbade for good reason
+// if we want to keep this here, we need to make sure we make a call to unlock the old mutex
 func (e *EtcdLock) setupMutex() error {
 	e.lg.Info("setting up mutex and renewing session")
 	if err := e.renewSession(); err != nil {
@@ -141,9 +143,7 @@ func (e *EtcdLock) setupMutex() error {
 	return nil
 }
 
-// TODO FIXME  this keeps trying if etcd is unreachable during the acquisition phase
-// TODO : grpc.WaitForReady(true) will cause lock acquisitions to block forever if the endpoint it connects to is unreachabale
-// https://github.com/etcd-io/etcd/issues/14631
+// TODO FIXME  this blocks if etcd is unreachable during the acquisition phase, may or may not be relevant
 func (e *EtcdLock) Lock(ctx context.Context) error {
 	e.lg.Info("setting up mutex")
 	if err := e.setupMutex(); err != nil {
@@ -205,10 +205,22 @@ func (e *EtcdLock) TryLock(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// TODO FIXME : this blocks until the unlock succeeds
 func (e *EtcdLock) Unlock() error {
+	ctx, ca := context.WithTimeout(e.client.Ctx(), 60*time.Second)
+	defer ca()
+	return e.unlock(ctx)
+}
+
+// best effort unlock until context is done, at which point we
+// basically disconnect the connection keepalive semantic by orphany the mutex's session
+// which delegates unlock the key to the KV server-side,
+// giving the guarantee that unlock always actually unlocks when called
+func (e *EtcdLock) unlock(ctx context.Context) error {
 	if e.mutex == nil {
 		return errors.New("mutex not acquired")
+	}
+	if e.session == nil {
+		defer e.session.Orphan()
 	}
 	return e.mutex.Unlock(e.client.Ctx())
 }
