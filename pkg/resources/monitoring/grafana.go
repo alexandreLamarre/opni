@@ -438,37 +438,37 @@ func createDatasourceJSONData() (json.RawMessage, error) {
 	datasourceCfg := make(map[string]any)
 	datasourceCfg["alertmanagerUid"] = "opni_alertmanager"
 	datasourceCfg["oauthPassThru"] = "true"
-	datasourceCfg["TlsAuthWithCACert"] = "true"
+	datasourceCfg["tlsAuthWithCACert"] = "true"
 
 	jsonData, err := json.Marshal(datasourceCfg)
 	if err != nil {
 		return nil, err
 	}
-	return json.RawMessage(jsonData), nil
+	return jsonData, nil
 }
 
 func createAlertManagerDatasourceJSONData() (json.RawMessage, error) {
 	datasourceCfg := make(map[string]any)
 	datasourceCfg["implementation"] = "cortex"
 	datasourceCfg["oauthPassThru"] = "true"
-	datasourceCfg["TlsAuthWithCACert"] = "true"
+	datasourceCfg["tlsAuthWithCACert"] = "true"
 
 	jsonData, err := json.Marshal(datasourceCfg)
 	if err != nil {
 		return nil, err
 	}
-	return json.RawMessage(jsonData), nil
+	return jsonData, nil
 }
 
 func createDatasourceSecureJSONData() (json.RawMessage, error) {
 	datasourceSecureCfg := make(map[string]any)
 	datasourceSecureCfg["tlsCACert"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/ca.crt}"
-	datasourceSecureCfg["TlsClientCert"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.crt}"
-	datasourceSecureCfg["TlsClientKey"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.key}"
+	datasourceSecureCfg["tlsClientCert"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.crt}"
+	datasourceSecureCfg["tlsClientKey"] = "$__file{/etc/grafana-secrets/opni-gateway-client-cert/tls.key}"
 
 	jsonData, err := json.Marshal(datasourceSecureCfg)
 	if err != nil {
 		return nil, err
 	}
-	return json.RawMessage(jsonData), nil
+	return jsonData, nil
 }
