@@ -165,7 +165,8 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				},
 				Datasources: []grafanav1beta1.GrafanaDashboardDatasource{
 					{
-						DatasourceName: "opni-datasource",
+						DatasourceName: "Opni",
+						InputName:      "P0BEE70D62F42845E",
 					},
 				},
 			},
