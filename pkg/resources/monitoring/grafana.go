@@ -351,22 +351,28 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			scopes = []string{"openid", "profile", "email"}
 		}
 		grafanaAuthGenericOauthCfg := map[string]string{
-			"enabled":                  "true",
-			"client_id":                spec.ClientID,
-			"client_secret":            spec.ClientSecret,
-			"scopes":                   strings.Join(scopes, " "),
-			"auth_url":                 wkc.AuthEndpoint,
-			"token_url":                wkc.TokenEndpoint,
-			"api_url":                  wkc.UserinfoEndpoint,
-			"role_attribute_path":      spec.RoleAttributePath,
-			"allow_sign_up":            strconv.FormatBool(lo.FromPtrOr(spec.AllowSignUp, false)),
-			"allowed_domains":          strings.Join(spec.AllowedDomains, " "),
-			"role_attribute_strict":    strconv.FormatBool(lo.FromPtrOr(spec.RoleAttributeStrict, false)),
-			"email_attribute_path":     spec.EmailAttributePath,
-			"tls_skip_verify_insecure": strconv.FormatBool(lo.FromPtrOr(spec.InsecureSkipVerify, false)),
-			"tls_client_cert":          spec.TLSClientCert,
-			"tls_client_key":           spec.TLSClientKey,
-			"tls_client_ca":            spec.TLSClientCA,
+			"enabled":              "true",
+			"client_id":            spec.ClientID,
+			"client_secret":        spec.ClientSecret,
+			"scopes":               strings.Join(scopes, " "),
+			"auth_url":             wkc.AuthEndpoint,
+			"token_url":            wkc.TokenEndpoint,
+			"api_url":              wkc.UserinfoEndpoint,
+			"role_attribute_path":  spec.RoleAttributePath,
+			"allowed_domains":      strings.Join(spec.AllowedDomains, " "),
+			"email_attribute_path": spec.EmailAttributePath,
+			"tls_client_cert":      spec.TLSClientCert,
+			"tls_client_key":       spec.TLSClientKey,
+			"tls_client_ca":        spec.TLSClientCA,
+		}
+		if spec.AllowSignUp != nil {
+			grafanaAuthGenericOauthCfg["allow_sign_up"] = strconv.FormatBool(lo.FromPtr(spec.AllowSignUp))
+		}
+		if spec.InsecureSkipVerify != nil {
+			grafanaAuthGenericOauthCfg["tls_skip_verify_insecure"] = strconv.FormatBool(lo.FromPtr(spec.InsecureSkipVerify))
+		}
+		if spec.RoleAttributeStrict != nil {
+			grafanaAuthGenericOauthCfg["role_attribute_strict"] = strconv.FormatBool(lo.FromPtr(spec.RoleAttributeStrict))
 		}
 
 		grafana.Spec.Config["auth.generic_oauth"] = grafanaAuthGenericOauthCfg
@@ -412,7 +418,7 @@ func createDefaultGrafanaIni(grafanaHostname string) map[string]map[string]strin
 	oauthSection := make(map[string]string)
 	oauthSection["enabled"] = "true"
 	oauthSection["scopes"] = "openid profile email"
-	config["authGenericOauth"] = oauthSection
+	config["auth.generic_oauth"] = oauthSection
 
 	unifiedAlertingSection := make(map[string]string)
 	unifiedAlertingSection["enabled"] = "true"
