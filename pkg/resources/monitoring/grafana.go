@@ -147,6 +147,11 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				InstanceSelector: &metav1.LabelSelector{
 					MatchLabels: dashboardSelector.MatchLabels,
 				},
+				Datasources: []grafanav1beta1.GrafanaDashboardDatasource{
+					{
+						DatasourceName: "opni-datasource",
+					},
+				},
 			},
 		},
 		{
