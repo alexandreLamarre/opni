@@ -95,6 +95,7 @@ type EtcdLock struct {
 
 	// only accessed atomically
 	setup *uint32
+	done  chan struct{}
 
 	options *lock.LockOptions
 }
@@ -131,23 +132,25 @@ var _ storage.Lock = (*EtcdLock)(nil)
 
 // TODO : this doesn't handle setting up repeated mutexes, which the original implementation forbade for good reason
 // if we want to keep this here, we need to make sure we make a call to unlock the old mutex
-func (e *EtcdLock) setupMutex() error {
+func (e *EtcdLock) setupMutex() (chan struct{}, error) {
 	e.lg.Info("setting up mutex and renewing session")
 	if err := e.renewSession(); err != nil {
-		return err
+		return nil, err
 	}
 	if atomic.CompareAndSwapUint32(e.setup, 0, 1) {
 		e.lg.Debug("set mutex once and only once")
 		e.mutex = concurrencyx.NewMutex(e.session, path.Join(e.prefix, e.key), e.options.InitialValue)
+		e.done = make(chan struct{}, 1)
+		return e.done, nil
 	}
-	return nil
+	return nil, errors.New("temporarily unhandled edge case")
 }
 
 // TODO FIXME  this blocks if etcd is unreachable during the acquisition phase, may or may not be relevant
-func (e *EtcdLock) Lock(ctx context.Context) error {
+func (e *EtcdLock) Lock(ctx context.Context) (chan struct{}, error) {
 	e.lg.Info("setting up mutex")
-	if err := e.setupMutex(); err != nil {
-		return err
+	if _, err := e.setupMutex(); err != nil {
+		return nil, err
 	}
 
 	// ctx := e.client.Ctx()
@@ -155,7 +158,7 @@ func (e *EtcdLock) Lock(ctx context.Context) error {
 	// 	ctx = e.options.AcquireContext
 	// }
 
-	return e.mutex.Lock(ctx)
+	return e.done, e.mutex.Lock(ctx)
 	// return e.startLock.Do(func() error {
 	// 	ctxca, ca := context.WithCancelCause(e.client.Ctx())
 	// 	signalAcquired := make(chan struct{})
@@ -189,20 +192,20 @@ func (e *EtcdLock) Lock(ctx context.Context) error {
 	// })
 }
 
-func (e *EtcdLock) TryLock(ctx context.Context) (bool, error) {
+func (e *EtcdLock) TryLock(ctx context.Context) (acquired bool, done chan struct{}, err error) {
 	e.lg.Info("setting up mutex for try lock")
 
-	if err := e.setupMutex(); err != nil {
-		return false, err
+	if _, err := e.setupMutex(); err != nil {
+		return false, nil, err
 	}
-	err := e.mutex.TryLock(ctx)
+	err = e.mutex.TryLock(ctx)
 	if err != nil {
 		if errors.Is(err, concurrency.ErrLocked) {
-			return false, nil
+			return false, nil, nil
 		}
-		return false, err
+		return false, nil, err
 	}
-	return true, nil
+	return true, e.done, nil
 }
 
 func (e *EtcdLock) Unlock() error {

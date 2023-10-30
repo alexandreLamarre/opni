@@ -36,7 +36,9 @@ type Lock struct {
 	*lock.LockOptions
 
 	signalUnlock chan struct{}
-	lg           *slog.Logger
+	done         chan struct{}
+
+	lg *slog.Logger
 }
 
 var _ storage.Lock = (*Lock)(nil)
@@ -55,11 +57,11 @@ func NewLock(js nats.JetStreamContext, key string, options *lock.LockOptions) *L
 	}
 }
 
-func (l *Lock) Lock(ctx context.Context) error {
+func (l *Lock) Lock(ctx context.Context) (chan struct{}, error) {
 	return l.lock(ctx)
 }
 
-func (l *Lock) lock(ctx context.Context) error {
+func (l *Lock) lock(ctx context.Context) (chan struct{}, error) {
 	tTicker := time.NewTicker(l.retryDelay)
 	defer tTicker.Stop()
 
@@ -67,22 +69,23 @@ func (l *Lock) lock(ctx context.Context) error {
 	for {
 		select {
 		case <-tTicker.C:
-			err := l.tryLock()
+			done, err := l.doLock()
 			if err == nil {
-				return nil
+				l.done = done
+				return done, nil
 			}
 			lockErr = err
 		case <-ctx.Done():
-			return errors.Join(l.AcquireContext.Err(), lockErr)
+			return nil, errors.Join(l.AcquireContext.Err(), lockErr)
 		}
 	}
 }
 
-func (l *Lock) tryLock() error {
+func (l *Lock) doLock() (chan struct{}, error) {
 	l.lg.With("key", l.key).Debug("trying to acquire lock")
 	var err error
 	if _, err := l.js.AddStream(newLease(l.key)); err != nil {
-		return err
+		return nil, err
 	}
 	cfg := &nats.ConsumerConfig{
 		Durable:           l.uuid,
@@ -94,18 +97,29 @@ func (l *Lock) tryLock() error {
 
 	if _, err := l.js.AddConsumer(l.key, cfg); err != nil {
 		l.lg.Error(fmt.Sprintf("failed to add consumer : %s", err.Error()))
-		return err
+		return nil, err
 	}
 	l.sub, err = l.js.ChanSubscribe(l.uuid, l.msgQ, nats.Bind(l.key, l.uuid))
 	if err != nil {
 		l.lg.Error(fmt.Sprintf("failed to subscribe : %s", err.Error()))
-		return err
+		return nil, err
 	}
 	go l.keepalive()
-	return nil
+	return nil, nil
+}
+
+func (l *Lock) signalDone() {
+	if l.done == nil {
+		return
+	}
+	select {
+	case <-l.done:
+	default:
+	}
 }
 
 func (l *Lock) keepalive() {
+	defer l.signalDone()
 	for {
 		select {
 		case msg, ok := <-l.msgQ:
@@ -120,7 +134,6 @@ func (l *Lock) keepalive() {
 		case <-l.signalUnlock:
 			return
 		}
-
 	}
 }
 
@@ -179,17 +192,17 @@ func (l *Lock) Key() string {
 	return l.key
 }
 
-func (l *Lock) TryLock(_ context.Context) (acquired bool, err error) {
-	err = l.tryLock()
+func (l *Lock) TryLock(_ context.Context) (acquired bool, done chan struct{}, err error) {
+	done, err = l.doLock()
 	if err == nil {
-		return true, nil
+		return true, done, nil
 	}
 
 	// hack : jetstream client does not have an error type for : maxium consumers limit reached
 	if strings.Contains(err.Error(), "maximum consumers limit reached") {
 		// the request has gone through but someone else has the lock
-		return false, nil
+		return false, nil, nil
 	}
 
-	return false, err
+	return false, nil, err
 }

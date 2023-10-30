@@ -226,8 +226,9 @@ func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg 
 	defer acquireCancel()
 
 	lock := lm.Locker(config.Key, lock.WithAcquireContext(acquireCtx))
+	var lockDone chan struct{}
 	if config.Try {
-		ack, err := lock.TryLock(ctxca)
+		ack, lockChan, err := lock.TryLock(ctxca)
 		if err != nil {
 			lg.With("err", err).Error("failed to acquire lock")
 			return errors.Join(err, ErrFailedToAcquireLock)
@@ -235,11 +236,14 @@ func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg 
 		if !ack {
 			return ErrLockAcquired
 		}
+		lockDone = lockChan
 	} else {
-		if err := lock.Lock(ctxca); err != nil {
+		lockChan, err := lock.Lock(ctxca)
+		if err != nil {
 			lg.With("err", err).Error("failed to acquire lock")
 			return errors.Join(err, ErrFailedToAcquireLock)
 		}
+		lockDone = lockChan
 	}
 	lg.Info("acquired lock")
 	defer func() {
@@ -260,6 +264,9 @@ func acquire(ctx context.Context, config LockConfig, lm storage.LockManager, lg 
 			exit = true
 		case <-t.C:
 			lg.Info("lock is held")
+		case <-lockDone:
+			lg.Warn("lock expired while it was held")
+			return errors.New("lock expired")
 		}
 		if exit {
 			break
