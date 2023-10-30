@@ -133,7 +133,8 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			},
 			Datasource: &grafanav1beta1.GrafanaDatasourceInternal{
 				Name:   "Opni Alertmanager",
-				Type:   "opni_alertmanager",
+				UID:    "opni_alertmanager",
+				Type:   "alertmanager",
 				Access: "proxy",
 				URL:    fmt.Sprintf("https://opni-internal.%s.svc:8080/api/prom", r.mc.Namespace),
 				// WithCredentials: lo.toPtr(true),
