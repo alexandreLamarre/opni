@@ -277,6 +277,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		tag = strings.TrimSpace(r.mc.Spec.Grafana.GetVersion())
 	}
 
+	secret := "opni-gateway-client-cert"
 	defaults := grafanav1beta1.GrafanaSpec{
 		Client: &grafanav1beta1.GrafanaClient{
 			PreferIngress: lo.ToPtr(false),
@@ -298,8 +299,8 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 								},
 								VolumeMounts: []corev1.VolumeMount{
 									{
-										Name:      "secret-opni-gateway-client-cert",
-										MountPath: "/etc/grafana-secrets/opni-gateway-client-cert",
+										Name:      fmt.Sprintf("secret-%s", secret),
+										MountPath: "/etc/grafana-secrets/" + secret,
 									},
 								},
 							},
@@ -309,10 +310,11 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 						},
 						Volumes: []corev1.Volume{
 							{
-								Name: "secret-opni-gateway-client-cert",
+								Name: fmt.Sprintf("secret-%s", secret),
 								VolumeSource: corev1.VolumeSource{
 									Secret: &corev1.SecretVolumeSource{
-										SecretName: "opni-gateway-client-cert",
+										SecretName: secret,
+										Optional:   lo.ToPtr(true),
 									},
 								},
 							},
@@ -400,7 +402,9 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			"token_url":           wkc.TokenEndpoint,
 			"api_url":             wkc.UserinfoEndpoint,
 			"role_attribute_path": spec.RoleAttributePath,
-			"allowed_domains":     strings.Join(spec.AllowedDomains, " "),
+		}
+		if len(spec.AllowedDomains) > 0 {
+			grafanaAuthGenericOauthCfg["allowed_domains"] = strings.Join(spec.AllowedDomains, " ")
 		}
 		if spec.AllowSignUp != nil {
 			grafanaAuthGenericOauthCfg["allow_sign_up"] = strconv.FormatBool(lo.FromPtr(spec.AllowSignUp))
