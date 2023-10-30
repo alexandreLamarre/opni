@@ -106,14 +106,14 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				JSONData:       opniDatasourceJSONCfg,
 				SecureJSONData: opniDatasourceSecureJSONCfg,
 			},
-			Plugins: []grafanav1beta1.GrafanaPlugin{
-				{
-					Name: "grafana-polystat-panel",
-				},
-				{
-					Name: "marcusolsson-treemap-panel",
-				},
-			},
+			//Plugins: []grafanav1beta1.GrafanaPlugin{
+			//	{
+			//		Name: "grafana-polystat-panel",
+			//	},
+			//	{
+			//		Name: "marcusolsson-treemap-panel",
+			//	},
+			//},
 		},
 	}
 
@@ -295,10 +295,26 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 										Value: "grafana-polystat-panel,marcusolsson-treemap-panel",
 									},
 								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "secret-opni-gateway-client-cert",
+										MountPath: "/etc/grafana-secrets/opni-gateway-client-cert",
+									},
+								},
 							},
 						},
 						SecurityContext: &corev1.PodSecurityContext{
 							FSGroup: lo.ToPtr(int64(472)),
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "secret",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName: "opni-gateway-client-cert",
+									},
+								},
+							},
 						},
 					},
 				},
