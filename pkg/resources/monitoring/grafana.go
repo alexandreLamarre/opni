@@ -466,8 +466,8 @@ func createDefaultGrafanaIni(grafanaHostname string) map[string]map[string]strin
 func createDatasourceJSONData() (json.RawMessage, error) {
 	datasourceCfg := make(map[string]any)
 	datasourceCfg["alertmanagerUid"] = "opni_alertmanager"
-	datasourceCfg["oauthPassThru"] = "true"
-	datasourceCfg["tlsAuthWithCACert"] = "true"
+	datasourceCfg["oauthPassThru"] = true
+	datasourceCfg["tlsAuthWithCACert"] = true
 
 	jsonData, err := json.Marshal(datasourceCfg)
 	if err != nil {
@@ -479,8 +479,8 @@ func createDatasourceJSONData() (json.RawMessage, error) {
 func createAlertManagerDatasourceJSONData() (json.RawMessage, error) {
 	datasourceCfg := make(map[string]any)
 	datasourceCfg["implementation"] = "cortex"
-	datasourceCfg["oauthPassThru"] = "true"
-	datasourceCfg["tlsAuthWithCACert"] = "true"
+	datasourceCfg["oauthPassThru"] = true
+	datasourceCfg["tlsAuthWithCACert"] = true
 
 	jsonData, err := json.Marshal(datasourceCfg)
 	if err != nil {
