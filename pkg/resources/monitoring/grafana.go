@@ -308,7 +308,7 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 						},
 						Volumes: []corev1.Volume{
 							{
-								Name: "secret",
+								Name: "secret-opni-gateway-client-cert",
 								VolumeSource: corev1.VolumeSource{
 									Secret: &corev1.SecretVolumeSource{
 										SecretName: "opni-gateway-client-cert",
