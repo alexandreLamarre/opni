@@ -304,6 +304,13 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 				},
 			},
 		},
+		ServiceAccount: &grafanav1beta1.ServiceAccountV1{
+			Secrets: []corev1.ObjectReference{
+				{
+					Name: "opni-gateway-client-cert",
+				},
+			},
+		},
 		// Secrets: []string{"opni-gateway-client-cert"},
 		PersistentVolumeClaim: &grafanav1beta1.PersistentVolumeClaimV1{
 			Spec: &grafanav1beta1.PersistentVolumeClaimV1Spec{
@@ -368,19 +375,15 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 			scopes = []string{"openid", "profile", "email"}
 		}
 		grafanaAuthGenericOauthCfg := map[string]string{
-			"enabled":              "true",
-			"client_id":            spec.ClientID,
-			"client_secret":        spec.ClientSecret,
-			"scopes":               strings.Join(scopes, " "),
-			"auth_url":             wkc.AuthEndpoint,
-			"token_url":            wkc.TokenEndpoint,
-			"api_url":              wkc.UserinfoEndpoint,
-			"role_attribute_path":  spec.RoleAttributePath,
-			"allowed_domains":      strings.Join(spec.AllowedDomains, " "),
-			"email_attribute_path": spec.EmailAttributePath,
-			"tls_client_cert":      spec.TLSClientCert,
-			"tls_client_key":       spec.TLSClientKey,
-			"tls_client_ca":        spec.TLSClientCA,
+			"enabled":             "true",
+			"client_id":           spec.ClientID,
+			"client_secret":       spec.ClientSecret,
+			"scopes":              strings.Join(scopes, " "),
+			"auth_url":            wkc.AuthEndpoint,
+			"token_url":           wkc.TokenEndpoint,
+			"api_url":             wkc.UserinfoEndpoint,
+			"role_attribute_path": spec.RoleAttributePath,
+			"allowed_domains":     strings.Join(spec.AllowedDomains, " "),
 		}
 		if spec.AllowSignUp != nil {
 			grafanaAuthGenericOauthCfg["allow_sign_up"] = strconv.FormatBool(lo.FromPtr(spec.AllowSignUp))
@@ -390,6 +393,15 @@ func (r *Reconciler) grafana() ([]resources.Resource, error) {
 		}
 		if spec.RoleAttributeStrict != nil {
 			grafanaAuthGenericOauthCfg["role_attribute_strict"] = strconv.FormatBool(lo.FromPtr(spec.RoleAttributeStrict))
+		}
+		if spec.TLSClientCA != "" && spec.TLSClientCert != "" && spec.TLSClientKey != "" {
+			grafanaAuthGenericOauthCfg["tls_client_cert"] = spec.TLSClientCert
+			grafanaAuthGenericOauthCfg["tls_client_key"] = spec.TLSClientKey
+			grafanaAuthGenericOauthCfg["tls_client_ca"] = spec.TLSClientCA
+		}
+		if spec.EmailAttributePath != "" {
+			grafanaAuthGenericOauthCfg["email_attribute_path"] = spec.EmailAttributePath
+
 		}
 
 		grafana.Spec.Config["auth.generic_oauth"] = grafanaAuthGenericOauthCfg
